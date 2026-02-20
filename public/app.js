@@ -248,9 +248,9 @@ async function checkRemoteSystems() {
     state.remoteSystems.umbrel = 'stopped';
   }
   
-  // Check GO Transit (local port 3000)
+  // Check GO Transit (local port 3000) - just check if page loads
   try {
-    const gotransitRes = await fetch('http://localhost:3000/api/health', { 
+    const gotransitRes = await fetch('http://localhost:3000/', { 
       signal: AbortSignal.timeout(5000)
     });
     state.remoteSystems.gotransit = gotransitRes.ok ? 'running' : 'stopped';
