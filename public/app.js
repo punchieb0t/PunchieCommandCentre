@@ -237,21 +237,20 @@ async function fetchAllData() {
 }
 
 async function checkRemoteSystems() {
-  // Check Portainer on Umbrel (10.0.0.147:9000)
+  // Check Umbrel via backend (avoids CORS)
   try {
-    const portainerRes = await fetch('http://10.0.0.147:9000/api/system/status', { 
-      method: 'GET',
-      signal: AbortSignal.timeout(5000)
+    const umbrelRes = await fetch('/api/umbrel', { 
+      signal: AbortSignal.timeout(10000)
     });
-    state.remoteSystems.portainer = portainerRes.ok ? 'running' : 'stopped';
+    const umbrelData = await umbrelRes.json();
+    state.remoteSystems.umbrel = umbrelData.umbrelOnline ? 'running' : 'stopped';
   } catch (e) {
-    state.remoteSystems.portainer = 'stopped';
+    state.remoteSystems.umbrel = 'stopped';
   }
   
-  // Check GOTransitJS (local port 3001)
+  // Check GO Transit (local port 3000)
   try {
-    const gotransitRes = await fetch('http://localhost:3001/api/health', { 
-      method: 'GET',
+    const gotransitRes = await fetch('http://localhost:3000/api/health', { 
       signal: AbortSignal.timeout(5000)
     });
     state.remoteSystems.gotransit = gotransitRes.ok ? 'running' : 'stopped';
@@ -500,8 +499,8 @@ function updateSystemView() {
   // Remote Systems
   const remoteList = document.getElementById('remoteSystemsList');
   const systems = [
-    { name: 'Portainer (Umbrel)', status: remoteSystems.portainer || 'unknown' },
-    { name: 'GOTransitJS', status: remoteSystems.gotransit || 'unknown' }
+    { name: 'Umbrel (Pi)', status: remoteSystems.umbrel || 'unknown' },
+    { name: 'GO Transit', status: remoteSystems.gotransit || 'unknown' }
   ];
   
   remoteList.innerHTML = systems.map(sys => `
