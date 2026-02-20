@@ -394,7 +394,7 @@ function updateCalendar() {
             <div class="timeline-event">
               <span class="event-time">${formatTime12Hour(e.time)}</span>
               <div class="event-info">
-                <div class="event-name">${renderIcon(getJobIcon(e.job))}</div>
+                <div class="event-name">${e.job.name}</div>
                 <div class="event-schedule">${cronToEnglish(e.job.schedule)}</div>
               </div>
               <div class="event-status ${e.job.status || 'pending'}"></div>
