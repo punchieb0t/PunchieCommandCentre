@@ -44,6 +44,59 @@ function getJobDisplayName(job) {
   return scriptName.replace(_/g, " ").replace(/\\b\\w/g, l => l.toUpperCase());
 }
 
+
+// Icon SVG mapping - returns SVG string for icon name
+function getJobIcon(job) {
+  const icons = {
+    "backup_wrapper.sh": "hard-drive",
+    "verify_wrapper.sh": "check-circle",
+    "send_morning_briefing.sh": "newspaper",
+    "check_briefing.sh": "search",
+    "morning_prep.sh": "sunrise",
+    "tibiadrome_wrapper.sh": "swords",
+    "tibiagoals_wrapper.sh": "target",
+    "team_hunt_wrapper.sh": "crosshair",
+    "minimax_wrapper.sh": "bar-chart-2",
+    "security_audit_wrapper.sh": "shield",
+    "double_exp_wrapper.sh": "zap",
+    "cron_monitor": "clock",
+    "sync_agents_pcloud.sh": "cloud",
+    "daily_review_wrapper.sh": "file-text",
+    "weekly_review_wrapper.sh": "calendar",
+    "olympics_canada_monitor.py": "trophy",
+    "go_transit_morning.sh": "train",
+  };
+  const searchText = (job.name || '') + ' ' + (job.command || '');
+  for (const [key, icon] of Object.entries(icons)) {
+    if (searchText.includes(key)) return icon;
+  }
+  return 'terminal';
+}
+
+function renderIcon(iconName) {
+  const svgs = {
+    'hard-drive': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg>',
+    'check-circle': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    'newspaper': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2Zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8z"/></svg>',
+    'search': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+    'sunrise': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 18a5 5 0 00-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/></svg>',
+    'swords': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/></svg>',
+    'target': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+    'crosshair': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/></svg>',
+    'bar-chart-2': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+    'shield': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+    'zap': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+    'clock': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    'cloud': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg>',
+    'file-text': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+    'calendar': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>',
+    'trophy': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/></svg>',
+    'train': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="16" rx="2"/><path d="M4 11V8a2 2 0 012-2h12a2 2 0 012 2v3"/></svg>',
+    'terminal': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>',
+  };
+  return svgs[iconName] || svgs['terminal'];
+}
+
 function getWeekStart(date) {
   const d = new Date(date);
   const day = d.getDay();
@@ -341,7 +394,7 @@ function updateCalendar() {
             <div class="timeline-event">
               <span class="event-time">${formatTime12Hour(e.time)}</span>
               <div class="event-info">
-                <div class="event-name">${getIconSvg(getJobDisplayName(e.job).icon)}${getJobDisplayName(e.job).label}</div>
+                <div class="event-name">${renderIcon(getJobIcon(e.job))}</div>
                 <div class="event-schedule">${cronToEnglish(e.job.schedule)}</div>
               </div>
               <div class="event-status ${e.job.status || 'pending'}"></div>
@@ -397,7 +450,7 @@ function updateJobsList() {
   jobsList.innerHTML = jobs.map(job => `
     <div class="job-card" data-type="${job.type}">
       <div class="job-header">
-        <div class="job-name">${getIconSvg(getJobDisplayName(job).icon)}${getJobDisplayName(job).label}</div>
+        <div class="job-name">${renderIcon(getJobIcon(job))}</div>
         <span class="job-type ${job.type}">${job.type}</span>
       </div>
       <div class="job-meta">
