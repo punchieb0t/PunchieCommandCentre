@@ -534,11 +534,11 @@ function updateSystemView() {
 // ===== Loading =====
 function setLoading(loading) {
   state.loading = loading;
-  const overlay = document.getElementById('loadingOverlay');
+  const btn = document.getElementById('refreshBtn');
   if (loading) {
-    overlay.classList.add('visible');
+    btn.classList.add('spinning');
   } else {
-    overlay.classList.remove('visible');
+    btn.classList.remove('spinning');
   }
 }
 
