@@ -496,24 +496,6 @@ function updateSystemView() {
     document.getElementById('diskUsage').textContent = system.disk || '--';
   }
   
-  const servicesList = document.getElementById('servicesList');
-  if (Array.isArray(services) && services.length > 0) {
-    servicesList.innerHTML = services.map(svc => `
-      <div class="service-item">
-        <span class="service-name">${svc.name || svc.service}</span>
-        <span class="service-status ${svc.status === 'running' ? 'running' : 'stopped'}">
-          ${svc.status || 'unknown'}
-        </span>
-      </div>
-    `).join('');
-  } else {
-    servicesList.innerHTML = `
-      <div class="empty-state">
-        <p>No services data</p>
-      </div>
-    `;
-  }
-  
   // Remote Systems
   const remoteList = document.getElementById('remoteSystemsList');
   const systems = [
