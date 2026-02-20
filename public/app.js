@@ -59,6 +59,50 @@ function formatTime(date) {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+// 12-hour format with AM/PM
+function formatTime12Hour(date) {
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+// Convert cron to plain English
+function cronToEnglish(cron) {
+  const parts = cron.split(' ');
+  if (parts.length < 5) return cron;
+  
+  const [min, hour, , , dow] = parts;
+  
+  // Daily at specific time
+  if (min !== '*' && hour !== '*' && dow === '*') {
+    const h = parseInt(hour);
+    const m = min === '0' ? '' : `:${min}`;
+    const period = h >= 12 ? 'PM' : 'AM';
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `Daily at ${h12}${m} ${period}`;
+  }
+  
+  // Every X minutes
+  if (min.includes('/')) {
+    const interval = min.split('/')[1];
+    return `Every ${interval} minutes`;
+  }
+  
+  // Specific days
+  if (dow !== '*' && !dow.includes(',')) {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayName = days[parseInt(dow)] || dow;
+    if (min !== '*' && hour !== '*') {
+      const h = parseInt(hour);
+      const m = min === '0' ? '' : `:${min}`;
+      const period = h >= 12 ? 'PM' : 'AM';
+      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      return `Every ${dayName} at ${h12}${m} ${period}`;
+    }
+    return `Every ${dayName}`;
+  }
+  
+  return cron;
+}
+
 function addDays(date, days) {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
@@ -240,7 +284,7 @@ function updateCalendar() {
   
   for (let i = 0; i < 7; i++) {
     const day = addDays(state.currentWeekStart, i);
-    const dayStr = day.toISOString().split('T')[0];
+    const dayStr = day.toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
     const isToday = day.getTime() === today.getTime();
     
     // Count jobs scheduled for this day
@@ -248,7 +292,7 @@ function updateCalendar() {
     jobsThisWeek.forEach(job => {
       const nextRuns = parseCronToNextRun(job.schedule);
       nextRuns.forEach(run => {
-        if (run.toISOString().split('T')[0] === dayStr) {
+        if (run.toLocaleDateString('en-CA') === dayStr) {
           jobCount++;
         }
       });
@@ -271,7 +315,7 @@ function updateCalendar() {
   jobsThisWeek.forEach(job => {
     const nextRuns = parseCronToNextRun(job.schedule);
     nextRuns.forEach(run => {
-      const dayStr = run.toISOString().split('T')[0];
+      const dayStr = run.toLocaleDateString('en-CA'); // YYYY-MM-DD local time
       if (!timelineDays[dayStr]) {
         timelineDays[dayStr] = [];
       }
@@ -295,10 +339,10 @@ function updateCalendar() {
         <div class="timeline-events">
           ${events.map(e => `
             <div class="timeline-event">
-              <span class="event-time">${formatTime(e.time)}</span>
+              <span class="event-time">${formatTime12Hour(e.time)}</span>
               <div class="event-info">
                 <div class="event-name">${getJobDisplayName(e.job)}</div>
-                <div class="event-schedule">${e.job.schedule}</div>
+                <div class="event-schedule">${cronToEnglish(e.job.schedule)}</div>
               </div>
               <div class="event-status ${e.job.status || 'pending'}"></div>
             </div>
@@ -357,7 +401,7 @@ function updateJobsList() {
         <span class="job-type ${job.type}">${job.type}</span>
       </div>
       <div class="job-meta">
-        <span class="job-schedule">${job.schedule}</span>
+        <span class="job-schedule">${cronToEnglish(job.schedule)}</span>
         <span class="job-lastrun">Last: ${job.lastRun || 'Never'}</span>
       </div>
     </div>
