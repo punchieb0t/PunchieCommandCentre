@@ -153,23 +153,30 @@ function checkJobStatus(cmdShort) {
 // Map commands to readable names
 function getJobName(cmd) {
   const nameMap = {
-    'backup_to_pcloud.sh': 'Backup to pCloud',
-    'verify_backup.sh': 'Verify Backup',
+    'backup_wrapper.sh': 'Backup to pCloud',
+    'verify_wrapper.sh': 'Verify Backup',
     'send_morning_briefing.sh': 'Morning Briefing',
-    'tibiadrome_reminder.sh': 'TibiaDrome Reminder',
-    'tibiagoals_reminder.sh': 'TibiaGoals Reminder',
-    'minimax_usage.py': 'Minimax Usage Report',
-    'double_exp_reminder.sh': 'Double Exp Reminder',
-    'security_audit.sh': 'Security Audit',
-    'Team hunt': 'Team Hunt Reminder',
-    'gog auth': 'gog Auth Reminder'
+    'morning_prep.sh': 'Morning Prep',
+    'check_briefing.sh': 'Check Briefing Sent',
+    'go_transit_morning.sh': 'GO Transit Morning',
+    'tibiadrome_wrapper.sh': 'TibiaDrome Reminder',
+    'tibiagoals_wrapper.sh': 'TibiaGoals Reminder',
+    'team_hunt_wrapper.sh': 'Team Hunt Reminder',
+    'daily_review_wrapper.sh': 'Daily Review',
+    'weekly_review_wrapper.sh': 'Weekly Review',
+    'minimax_wrapper.sh': 'Minimax Usage Report',
+    'security_audit_wrapper.sh': 'Security Audit',
+    'double_exp_wrapper.sh': 'Double Exp Reminder',
+    'sync_agents_pcloud.sh': 'Sync Agents to pCloud',
+    'olympics_canada_monitor.py': 'Olympics Canada Monitor',
+    'cron_monitor': 'Cron Alive Monitor'
   };
   
   for (const [key, name] of Object.entries(nameMap)) {
     if (cmd.includes(key)) return name;
   }
   
-  return cmd.replace(/^.*\//, '').replace(/\s>>.*$/, '').slice(0, 40);
+  return cmd.replace(/^.*\//, '').replace(/\s>>.*$/, '').replace(/\s2>&1$/, '').slice(0, 40);
 }
 
 // Get all jobs - reads from SYSTEM CRONTAB only
