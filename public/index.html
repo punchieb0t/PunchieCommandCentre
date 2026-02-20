@@ -30,7 +30,7 @@
     <!-- Status Cards -->
     <section class="status-grid">
       <div class="status-card">
-        <div class="status-icon">💻</div>
+        <div class="status-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div>
         <div class="status-content">
           <span class="status-label">CPU</span>
           <span class="status-value" id="cpuValue">--</span>
@@ -38,7 +38,7 @@
         <div class="status-bar"><div class="status-bar-fill" id="cpuBar"></div></div>
       </div>
       <div class="status-card">
-        <div class="status-icon">🧠</div>
+        <div class="status-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg></div>
         <div class="status-content">
           <span class="status-label">Memory</span>
           <span class="status-value" id="memValue">--</span>
@@ -46,7 +46,7 @@
         <div class="status-bar"><div class="status-bar-fill" id="memBar"></div></div>
       </div>
       <div class="status-card">
-        <div class="status-icon">☁️</div>
+        <div class="status-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg></div>
         <div class="status-content">
           <span class="status-label">Last Backup</span>
           <span class="status-value" id="backupValue">--</span>
@@ -54,7 +54,7 @@
         <span class="status-meta" id="backupTime"></span>
       </div>
       <div class="status-card">
-        <div class="status-icon">⏰</div>
+        <div class="status-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
         <div class="status-content">
           <span class="status-label">Cron Jobs</span>
           <span class="status-value" id="cronValue">--</span>
@@ -88,7 +88,7 @@
     <!-- Schedule View (7-Day Calendar) -->
     <section class="tab-content active" id="scheduleView">
       <div class="calendar-header">
-        <h2 class="section-title">📅 This Week</h2>
+        <h2 class="section-title"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg> This Week</h2>
         <div class="calendar-nav">
           <button class="nav-btn" id="prevWeek">←</button>
           <span id="weekRange">Feb 16 - Feb 22</span>
@@ -106,7 +106,7 @@
     <!-- Jobs View -->
     <section class="tab-content" id="jobsView">
       <div class="section-header">
-        <h2 class="section-title">⚙️ Cron Jobs</h2>
+        <h2 class="section-title"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg> Cron Jobs</h2>
         <div class="job-filters">
           <button class="filter-btn active" data-filter="all">All</button>
           <button class="filter-btn" data-filter="system">System</button>
@@ -120,7 +120,7 @@
 
     <!-- System View -->
     <section class="tab-content" id="systemView">
-      <h2 class="section-title">💻 System Status</h2>
+      <h2 class="section-title"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> System Status</h2>
       <div class="system-grid">
         <div class="system-card">
           <div class="system-header">
