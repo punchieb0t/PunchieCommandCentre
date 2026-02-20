@@ -379,9 +379,7 @@ function updateCalendar() {
     });
   });
   
-  // Sort days: today first, then chronological
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Sort days: today first, then chronological (reuse existing 'today' from line 332)
   const todayStr = today.toISOString().split('T')[0];
   
   const dayKeys = Object.keys(timelineDays).sort((a, b) => {
