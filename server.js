@@ -129,6 +129,39 @@ app.get('/api/umbrel', (req, res) => {
   }
 });
 
+// ===== GO TRANSIT =====
+
+// Get GO Transit status (proxy from server side)
+app.get('/api/gotransit', (req, res) => {
+  try {
+    const http = require('http');
+    const options = {
+      hostname: '127.0.0.1',
+      port: 3000,
+      path: '/',
+      method: 'GET',
+      timeout: 5000
+    };
+    
+    const req2 = http.request(options, (res2) => {
+      res.json({ status: res2.statusCode === 200 ? 'running' : 'stopped' });
+    });
+    
+    req2.on('error', () => {
+      res.json({ status: 'stopped' });
+    });
+    
+    req2.on('timeout', () => {
+      req2.destroy();
+      res.json({ status: 'stopped' });
+    });
+    
+    req2.end();
+  } catch (e) {
+    res.json({ status: 'stopped' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Punchie Command Centre running at http://localhost:${PORT}`);
 });
