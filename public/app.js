@@ -406,7 +406,7 @@ function updateCalendar() {
   const displayDayKeys = state.selectedDay ? dayKeys.filter(d => d === state.selectedDay) : dayKeys;
   
   displayDayKeys.forEach(dayStr => {
-    const dayDate = new Date(dayStr);
+    const dayDate = new Date(dayStr + 'T00:00:00'); // Force local time
     const events = timelineDays[dayStr].sort((a, b) => a.time - b.time);
     
     timelineHTML += `
