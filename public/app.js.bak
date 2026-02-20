@@ -341,7 +341,7 @@ function updateCalendar() {
             <div class="timeline-event">
               <span class="event-time">${formatTime12Hour(e.time)}</span>
               <div class="event-info">
-                <div class="event-name">${getIconSvg(getJobDisplayName(e.job).icon)}${getJobDisplayName(e.job).label}</div>
+                <div class="event-name">${getJobDisplayName(e.job)}</div>
                 <div class="event-schedule">${cronToEnglish(e.job.schedule)}</div>
               </div>
               <div class="event-status ${e.job.status || 'pending'}"></div>
@@ -397,7 +397,7 @@ function updateJobsList() {
   jobsList.innerHTML = jobs.map(job => `
     <div class="job-card" data-type="${job.type}">
       <div class="job-header">
-        <div class="job-name">${getIconSvg(getJobDisplayName(job).icon)}${getJobDisplayName(job).label}</div>
+        <div class="job-name">${getJobDisplayName(job)}</div>
         <span class="job-type ${job.type}">${job.type}</span>
       </div>
       <div class="job-meta">

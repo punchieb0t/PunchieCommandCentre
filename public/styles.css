@@ -494,6 +494,14 @@ body::before {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.event-name svg {
+  color: var(--accent-purple);
+  flex-shrink: 0;
 }
 
 .event-schedule {
@@ -572,6 +580,14 @@ body::before {
   font-weight: 500;
   color: var(--text-primary);
   word-break: break-all;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-name svg {
+  color: var(--accent-purple);
+  flex-shrink: 0;
 }
 
 .job-type {
