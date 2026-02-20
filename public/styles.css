@@ -719,19 +719,11 @@ body::before {
   color: var(--error);
 }
 
-/* ===== Loading Overlay ===== */
+/* ===== Quiet Loading Spinner ===== */
 .loading-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(5, 5, 7, 0.9);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
+  top: 12px;
+  right: 70px;
   z-index: 1000;
   opacity: 0;
   visibility: hidden;
@@ -744,17 +736,12 @@ body::before {
 }
 
 .loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border-color);
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-color);
   border-top-color: var(--accent-purple);
   border-radius: 50%;
   animation: spin 1s linear infinite;
-}
-
-.loading-overlay span {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
 }
 
 /* ===== Empty State ===== */
