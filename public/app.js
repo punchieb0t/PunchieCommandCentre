@@ -11,7 +11,7 @@ const state = {
 };
 
 // ===== Utilities =====
-function getJobDisplayName(cronLine) {
+function getJobDisplayName(job) {
   const nameMap = {
     "backup_wrapper.sh": "📦 Daily Backup to pCloud",
     "verify_wrapper.sh": "✅ Verify Backup",
@@ -32,8 +32,11 @@ function getJobDisplayName(cronLine) {
     "go_transit_morning.sh": "🚂 GO Transit Morning",
   };
   
+  // Check both name and command fields
+  const searchText = (job.name || '') + ' ' + (job.command || '');
+  
   for (const [key, value] of Object.entries(nameMap)) {
-    if (cronLine.includes(key)) { return value; }
+    if (searchText.includes(key)) { return value; }
   }
   
   const parts = cronLine.split("/");
@@ -294,7 +297,7 @@ function updateCalendar() {
             <div class="timeline-event">
               <span class="event-time">${formatTime(e.time)}</span>
               <div class="event-info">
-                <div class="event-name">${getJobDisplayName(e.job.name)}</div>
+                <div class="event-name">${getJobDisplayName(e.job)}</div>
                 <div class="event-schedule">${e.job.schedule}</div>
               </div>
               <div class="event-status ${e.job.status || 'pending'}"></div>
@@ -350,7 +353,7 @@ function updateJobsList() {
   jobsList.innerHTML = jobs.map(job => `
     <div class="job-card" data-type="${job.type}">
       <div class="job-header">
-        <div class="job-name">${getJobDisplayName(job.name)}</div>
+        <div class="job-name">${getJobDisplayName(job)}</div>
         <span class="job-type ${job.type}">${job.type}</span>
       </div>
       <div class="job-meta">
