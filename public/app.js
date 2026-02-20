@@ -379,8 +379,18 @@ function updateCalendar() {
     });
   });
   
-  // Sort days chronologically and render
-  Object.keys(timelineDays).sort((a, b) => new Date(a) - new Date(b)).forEach(dayStr => {
+  // Sort days: today first, then chronological
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+  
+  const dayKeys = Object.keys(timelineDays).sort((a, b) => {
+    if (a === todayStr) return -1; // today first
+    if (b === todayStr) return 1;
+    return new Date(a) - new Date(b);
+  });
+  
+  dayKeys.forEach(dayStr => {
     const dayDate = new Date(dayStr);
     const events = timelineDays[dayStr].sort((a, b) => a.time - b.time);
     
