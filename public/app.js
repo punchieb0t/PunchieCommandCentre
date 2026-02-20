@@ -492,8 +492,23 @@ function updateSystemView() {
   if (system) {
     document.getElementById('hostname').textContent = system.hostname || '--';
     document.getElementById('uptime').textContent = system.uptime || '--';
-    document.getElementById('loadAvg').textContent = system.loadAvg || '--';
-    document.getElementById('diskUsage').textContent = system.disk || '--';
+    document.getElementById('cpuUsage').textContent = system.cpu ? `${system.cpu}%` : '--';
+    
+    // Memory
+    if (system.memory) {
+      document.getElementById('memUsage').textContent = `${system.memory.used}GB (${system.memory.percent}%)`;
+      document.getElementById('memFree').textContent = `${system.memory.free}GB`;
+    } else {
+      document.getElementById('memUsage').textContent = '--';
+      document.getElementById('memFree').textContent = '--';
+    }
+    
+    // Format disk usage
+    if (system.disk && system.disk.used && system.disk.total) {
+      document.getElementById('diskUsage').textContent = `${system.disk.used}GB / ${system.disk.total}GB`;
+    } else {
+      document.getElementById('diskUsage').textContent = '--';
+    }
   }
   
   // Remote Systems
