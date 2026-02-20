@@ -11,6 +11,36 @@ const state = {
 };
 
 // ===== Utilities =====
+function getJobDisplayName(cronLine) {
+  const nameMap = {
+    "backup_wrapper.sh": "📦 Daily Backup to pCloud",
+    "verify_wrapper.sh": "✅ Verify Backup",
+    "send_morning_briefing.sh": "📰 Morning Briefing",
+    "check_briefing.sh": "🔍 Check Briefing Sent",
+    "morning_prep.sh": "🌅 Morning Prep",
+    "tibiadrome_wrapper.sh": "⚔️ TibiaDrome Reminder",
+    "tibiagoals_wrapper.sh": "🎯 TibiaGoals Reminder",
+    "team_hunt_wrapper.sh": "🗡️ Team Hunt Reminder",
+    "minimax_wrapper.sh": "📊 Minimax Usage Check",
+    "security_audit_wrapper.sh": "🔒 Security Audit",
+    "double_exp_wrapper.sh": "🎮 Double Exp Reminder",
+    "cron_monitor": "⏰ Cron Alive Monitor",
+    "sync_agents_pcloud.sh": "☁️ Sync Agents to pCloud",
+    "daily_review_wrapper.sh": "📝 Daily Review",
+    "weekly_review_wrapper.sh": "📅 Weekly Review",
+    "olympics_canada_monitor.py": "🏅 Olympics Monitor",
+    "go_transit_morning.sh": "🚂 GO Transit Morning",
+  };
+  
+  for (const [key, value] of Object.entries(nameMap)) {
+    if (cronLine.includes(key)) { return value; }
+  }
+  
+  const parts = cronLine.split("/");
+  const scriptName = parts[parts.length - 1].replace("_wrapper.sh", "").replace(".sh", "").replace(".py", "");
+  return scriptName.replace(_/g, " ").replace(/\\b\\w/g, l => l.toUpperCase());
+}
+
 function getWeekStart(date) {
   const d = new Date(date);
   const day = d.getDay();
@@ -249,8 +279,8 @@ function updateCalendar() {
     });
   });
   
-  // Sort days and render
-  Object.keys(timelineDays).sort().forEach(dayStr => {
+  // Sort days chronologically and render
+  Object.keys(timelineDays).sort((a, b) => new Date(a) - new Date(b)).forEach(dayStr => {
     const dayDate = new Date(dayStr);
     const events = timelineDays[dayStr].sort((a, b) => a.time - b.time);
     
@@ -264,7 +294,7 @@ function updateCalendar() {
             <div class="timeline-event">
               <span class="event-time">${formatTime(e.time)}</span>
               <div class="event-info">
-                <div class="event-name">${e.job.name}</div>
+                <div class="event-name">${getJobDisplayName(e.job.name)}</div>
                 <div class="event-schedule">${e.job.schedule}</div>
               </div>
               <div class="event-status ${e.job.status || 'pending'}"></div>
@@ -320,7 +350,7 @@ function updateJobsList() {
   jobsList.innerHTML = jobs.map(job => `
     <div class="job-card" data-type="${job.type}">
       <div class="job-header">
-        <div class="job-name">${job.name}</div>
+        <div class="job-name">${getJobDisplayName(job.name)}</div>
         <span class="job-type ${job.type}">${job.type}</span>
       </div>
       <div class="job-meta">
