@@ -7,6 +7,7 @@ const state = {
   remoteSystems: {},
   currentWeekStart: getWeekStart(new Date()),
   currentFilter: 'all',
+  selectedDay: null, // For filtering timeline by day
   loading: false
 };
 
@@ -273,6 +274,13 @@ async function refreshData() {
   document.getElementById('lastUpdated').textContent = `Updated ${formatTime(new Date())}`;
 }
 
+// ===== Day Selection =====
+function selectDay(dayStr) {
+  // Toggle: if clicking same day, deselect
+  state.selectedDay = state.selectedDay === dayStr ? null : dayStr;
+  updateCalendar();
+}
+
 // ===== UI Updates =====
 function updateUI() {
   updateStatusCards();
@@ -354,8 +362,10 @@ function updateCalendar() {
       });
     });
     
+    const isSelected = state.selectedDay === dayStr;
+    
     weekHTML += `
-      <div class="day-card ${isToday ? 'today' : ''} ${jobCount > 0 ? 'has-jobs' : ''}">
+      <div class="day-card ${isToday ? 'today' : ''} ${jobCount > 0 ? 'has-jobs' : ''} ${isSelected ? 'selected' : ''}" onclick="selectDay('${dayStr}')">
         <div class="day-name">${day.toLocaleDateString('en-US', { weekday: 'short' })}</div>
         <div class="day-number">${day.getDate()}</div>
         ${jobCount > 0 ? `<div class="day-jobs-count">${jobCount} job${jobCount > 1 ? 's' : ''}</div>` : ''}
@@ -383,7 +393,8 @@ function updateCalendar() {
   });
   
   // Sort days: today first, then chronological (reuse existing 'today' from line 332)
-  const todayStr = today.toISOString().split('T')[0];
+  // Use local time to match how days are stored
+  const todayStr = today.toLocaleDateString('en-CA');
   
   const dayKeys = Object.keys(timelineDays).sort((a, b) => {
     if (a === todayStr) return -1; // today first
@@ -391,7 +402,10 @@ function updateCalendar() {
     return new Date(a) - new Date(b);
   });
   
-  dayKeys.forEach(dayStr => {
+  // Filter to selected day if set
+  const displayDayKeys = state.selectedDay ? dayKeys.filter(d => d === state.selectedDay) : dayKeys;
+  
+  displayDayKeys.forEach(dayStr => {
     const dayDate = new Date(dayStr);
     const events = timelineDays[dayStr].sort((a, b) => a.time - b.time);
     

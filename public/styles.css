@@ -407,6 +407,11 @@ body::before {
   box-shadow: 0 0 12px var(--accent-purple-glow);
 }
 
+.day-card.selected {
+  border-color: var(--accent-green);
+  background: rgba(72, 187, 120, 0.15);
+}
+
 .day-card.has-jobs {
   background: var(--accent-purple-subtle);
 }
