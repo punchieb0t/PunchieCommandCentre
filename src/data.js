@@ -8,7 +8,10 @@ const { CronExpressionParser } = require('cron-parser');
 // Get next run time for a cron expression
 function getNextRun(schedule) {
   try {
-    const interval = CronExpressionParser.parse(schedule);
+    // Try parsing with cron-parser first (handles most cases including ranges)
+    const interval = CronExpressionParser.parse(schedule, {
+      tz: 'America/Toronto'
+    });
     const next = interval.next().toDate();
     return next.toLocaleString('en-US', { 
       timeZone: 'America/Toronto',
@@ -20,6 +23,7 @@ function getNextRun(schedule) {
       hour12: true
     });
   } catch (e) {
+    // Fallback: if parsing fails, return 'N/A'
     return 'N/A';
   }
 }
@@ -154,11 +158,12 @@ function checkJobStatus(cmdShort) {
 function getJobName(cmd) {
   const nameMap = {
     'backup_wrapper.sh': 'Backup to pCloud',
+    'cleanup_old_backups.sh': 'Backup Cleanup Log',
     'verify_wrapper.sh': 'Verify Backup',
     'send_morning_briefing.sh': 'Morning Briefing',
     'morning_prep.sh': 'Morning Prep',
     'check_briefing.sh': 'Check Briefing Sent',
-    'go_transit_morning.sh': 'GO Transit Morning',
+    'go_transit_morning.sh': 'GO Transit Morning Delay Check',
     'tibiadrome_wrapper.sh': 'TibiaDrome Reminder',
     'tibiagoals_wrapper.sh': 'TibiaGoals Reminder',
     'team_hunt_wrapper.sh': 'Team Hunt Reminder',
@@ -169,20 +174,83 @@ function getJobName(cmd) {
     'double_exp_wrapper.sh': 'Double Exp Reminder',
     'sync_agents_pcloud.sh': 'Sync Agents to pCloud',
     'olympics_canada_monitor.py': 'Olympics Canada Monitor',
-    'cron_monitor': 'Cron Alive Monitor'
+    'cron_monitor': 'Cron Alive Monitor',
+    'portainer_dind_monitor.py': 'Portainer DinD Monitor',
+    'metrolinx_tracker.py': 'GO Transit Delay Check',
+    'olympics_alert_system.py': 'Olympic Brief'
   };
   
   for (const [key, name] of Object.entries(nameMap)) {
     if (cmd.includes(key)) return name;
   }
   
-  return cmd.replace(/^.*\//, '').replace(/\s>>.*$/, '').replace(/\s2>&1$/, '').slice(0, 40);
+  // Humanize remaining names: convert underscores/hyphens to spaces, title case
+  let cleaned = cmd.replace(/^.*\//, '').replace(/\s>>.*$/, '').replace(/\s2>&1$/, '');
+  // Remove .sh, .py extensions
+  cleaned = cleaned.replace(/\.(sh|py)$/, '');
+  // Replace underscores/hyphens with spaces
+  cleaned = cleaned.replace(/[_-]/g, ' ');
+  // Title case first letter of each word
+  cleaned = cleaned.replace(/\b\w/g, l => l.toUpperCase());
+  
+  return cleaned.slice(0, 40);
 }
 
-// Get all jobs - reads from SYSTEM CRONTAB only
+// Get OpenClaw cron jobs
+function getOpenClawJobs() {
+  const jobs = [];
+  
+  try {
+    const output = execSync('openclaw cron list --json 2>/dev/null', { encoding: 'utf8', timeout: 10000 });
+    const data = JSON.parse(output);
+    
+    for (const job of data.jobs || []) {
+      jobs.push({
+        id: job.id,
+        name: job.name,
+        type: 'openclaw',
+        status: job.state?.lastStatus || 'unknown',
+        enabled: job.enabled,
+        schedule: job.schedule?.expr || job.schedule?.at || 'N/A',
+        command: job.payload?.message?.substring(0, 100) || job.payload?.text || 'agentTurn',
+        nextRun: job.state?.nextRunAtMs ? new Date(job.state.nextRunAtMs).toLocaleString('en-US', { 
+          timeZone: 'America/Toronto',
+          weekday: 'short',
+          month: 'short', 
+          day: 'numeric',
+          hour: 'numeric', 
+          minute: '2-digit',
+          hour12: true
+        }) : 'N/A',
+        lastRun: job.state?.lastRunAtMs ? new Date(job.state.lastRunAtMs).toLocaleString('en-US', { 
+          timeZone: 'America/Toronto',
+          weekday: 'short',
+          month: 'short', 
+          day: 'numeric',
+          hour: 'numeric', 
+          minute: '2-digit',
+          hour12: true
+        }) : 'never',
+        lastStatus: job.state?.lastStatus || 'unknown',
+        runCount: job.state?.runCount || 0,
+        runs: []
+      });
+    }
+  } catch (err) {
+    console.error('Error fetching OpenClaw jobs:', err.message);
+  }
+  
+  return jobs;
+}
+
+// Get all jobs - reads from SYSTEM CRONTAB + OPENCLAW
 function getAllJobs() {
   let jobs = getSystemCrontabJobs();
   const runsMap = getJobRunsFromSyslog();
+  
+  // Add OpenClaw cron jobs
+  const openclowJobs = getOpenClawJobs();
+  jobs = [...jobs, ...openclowJobs];
   
   // Merge runs into jobs
   for (const job of jobs) {

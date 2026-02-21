@@ -186,16 +186,34 @@ function parseCronToNextRun(cronExpr) {
   const runs = [];
   const now = new Date();
   
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 21; i++) {  // Extended from 14 to 21 days to catch more runs
     const checkDate = addDays(now, i);
     const dayOfWeek = checkDate.getDay();
     const dayOfMonth = checkDate.getDate();
-    const month = checkDate.getMonth() + 1;
+    const currentMonth = checkDate.getMonth() + 1;
     
     // Simplified cron check
     let matches = true;
+    
+    // Check day of month
     if (day !== '*' && day !== '0' && parseInt(day) !== dayOfMonth) matches = false;
-    if (weekday !== '*' && parseInt(weekday) !== dayOfWeek && weekday !== dayOfWeek.toString()) matches = false;
+    
+    // Check weekday - handle ranges like "1-5" (Mon-Fri)
+    if (weekday !== '*') {
+      let weekdayMatches = false;
+      
+      // Handle range like "1-5"
+      if (weekday.includes('-')) {
+        const [start, end] = weekday.split('-').map(d => parseInt(d));
+        weekdayMatches = dayOfWeek >= start && dayOfWeek <= end;
+      } else {
+        // Single day or comma-separated
+        const weekdays = weekday.split(',').map(d => parseInt(d));
+        weekdayMatches = weekdays.includes(dayOfWeek);
+      }
+      
+      if (!weekdayMatches) matches = false;
+    }
     
     if (matches) {
       const h = hour === '*' ? 0 : parseInt(hour) || 0;
@@ -209,7 +227,7 @@ function parseCronToNextRun(cronExpr) {
     }
   }
   
-  return runs.slice(0, 5);
+  return runs.slice(0, 10);  // Return up to 10 runs instead of 5
 }
 
 // ===== API Calls =====
