@@ -1,8 +1,9 @@
 const express = require('express');
 const path = require('path');
-const { getAllJobs, getJobLogs } = require('./src/data');
+const { getAllJobs, getJobLogs, getRunsForDate } = require('./src/data');
 const { getSystemStats, getCryptoPrices, getWeather, getBackupStatus, getServices } = require('./src/status');
 const { getUmbrelStatus } = require('./src/umbrel');
+const { getUmbrelContainers } = require('./src/status');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -28,6 +29,17 @@ app.get('/api/jobs/:id/logs', (req, res) => {
     const { id, type } = req.query;
     const logs = getJobLogs(id, type);
     res.json({ jobId: id, type, logs });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get runs for a specific date (YYYY-MM-DD)
+app.get('/api/runs/:date', (req, res) => {
+  try {
+    const { date } = req.params;
+    const runs = getRunsForDate(date);
+    res.json({ date, runs });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -75,6 +87,16 @@ app.get('/api/status/backups', (req, res) => {
 app.get('/api/status/services', (req, res) => {
   try {
     res.json(getServices());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get Docker containers from Umbrel
+app.get('/api/status/containers', (req, res) => {
+  try {
+    const containers = getUmbrelContainers();
+    res.json({ containers });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

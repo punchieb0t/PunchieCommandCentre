@@ -5,9 +5,11 @@ const state = {
   services: [],
   backup: null,
   remoteSystems: {},
+  containers: { containers: [] },
   currentWeekStart: getWeekStart(new Date()),
   currentFilter: 'all',
   selectedDay: null, // For filtering timeline by day
+  historicalRuns: [], // For storing actual runs from syslog
   loading: false
 };
 
@@ -235,17 +237,19 @@ async function fetchAllData() {
   setLoading(true);
   
   try {
-    const [systemRes, jobsRes, servicesRes, backupsRes] = await Promise.all([
+    const [systemRes, jobsRes, servicesRes, backupsRes, containersRes] = await Promise.all([
       fetch('/api/status/system'),
       fetch('/api/jobs'),
       fetch('/api/status/services'),
-      fetch('/api/status/backups')
+      fetch('/api/status/backups'),
+      fetch('/api/status/containers')
     ]);
     
     state.system = await systemRes.json();
     state.jobs = await jobsRes.json();
     state.services = await servicesRes.json();
     state.backup = await backupsRes.json();
+    state.containers = await containersRes.json();
     
     // Check remote systems
     await checkRemoteSystems();
@@ -293,7 +297,28 @@ async function refreshData() {
 }
 
 // ===== Day Selection =====
-function selectDay(dayStr) {
+async function selectDay(dayStr) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const selectedDate = new Date(dayStr);
+  selectedDate.setHours(0, 0, 0, 0);
+  
+  const isPast = selectedDate < today;
+  
+  // If selecting a past day, fetch historical runs
+  if (isPast) {
+    try {
+      const res = await fetch(`/api/runs/${dayStr}`);
+      const data = await res.json();
+      state.historicalRuns = data.runs || [];
+    } catch (err) {
+      console.error('Error fetching historical runs:', err);
+      state.historicalRuns = [];
+    }
+  } else {
+    state.historicalRuns = [];
+  }
+  
   // Toggle: if clicking same day, deselect
   state.selectedDay = state.selectedDay === dayStr ? null : dayStr;
   updateCalendar();
@@ -394,72 +419,100 @@ function updateCalendar() {
   
   // Build timeline
   let timelineHTML = '';
-  const timelineDays = {};
   
-  jobsThisWeek.forEach(job => {
-    const nextRuns = parseCronToNextRun(job.schedule);
-    nextRuns.forEach(run => {
-      const dayStr = run.toLocaleDateString('en-CA'); // YYYY-MM-DD local time
-      if (!timelineDays[dayStr]) {
-        timelineDays[dayStr] = [];
-      }
-      timelineDays[dayStr].push({
-        time: run,
-        job: job
-      });
-    });
-  });
-  
-  // Sort days: today first, then chronological (reuse existing 'today' from line 332)
-  // Use local time to match how days are stored
-  const todayStr = today.toLocaleDateString('en-CA');
-  
-  const dayKeys = Object.keys(timelineDays).sort((a, b) => {
-    if (a === todayStr) return -1; // today first
-    if (b === todayStr) return 1;
-    return new Date(a) - new Date(b);
-  });
-  
-  // Filter to selected day if set
-  const displayDayKeys = state.selectedDay ? dayKeys.filter(d => d === state.selectedDay) : dayKeys;
-  
-  displayDayKeys.forEach(dayStr => {
-    const dayDate = new Date(dayStr + 'T00:00:00'); // Force local time
-    const events = timelineDays[dayStr].sort((a, b) => a.time - b.time);
-    
+  // Check if viewing a past day - show historical runs instead of scheduled
+  if (state.selectedDay && state.historicalRuns.length > 0) {
+    const dayDate = new Date(state.selectedDay + 'T00:00:00');
     timelineHTML += `
       <div class="timeline-day">
         <div class="timeline-day-header">
-          ${dayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+          <span>${dayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
+          <span class="timeline-day-label">Historical Runs</span>
         </div>
         <div class="timeline-events">
-          ${events.map(e => `
-            <div class="timeline-event">
-              <span class="event-time">${formatTime12Hour(e.time)}</span>
-              <div class="event-info">
-                <div class="event-name">${e.job.name}</div>
-                <div class="event-schedule">${cronToEnglish(e.job.schedule)}</div>
-              </div>
-              <div class="event-status ${e.job.status || 'pending'}"></div>
-            </div>
-          `).join('')}
+    `;
+    
+    state.historicalRuns.forEach(run => {
+      const runTime = new Date(run.timestamp);
+      timelineHTML += `
+        <div class="timeline-event">
+          <div class="timeline-time">${runTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+          <div class="timeline-content">
+            <div class="timeline-job">${run.cmd}</div>
+          </div>
+        </div>
+      `;
+    });
+    
+    timelineHTML += `
         </div>
       </div>
     `;
-  });
-  
-  if (Object.keys(timelineDays).length === 0) {
-    timelineHTML = `
-      <div class="empty-state">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-          <line x1="16" y1="2" x2="16" y2="6"/>
-          <line x1="8" y1="2" x2="8" y2="6"/>
-          <line x1="3" y1="10" x2="21" y2="10"/>
-        </svg>
-        <p>No scheduled jobs this week</p>
-      </div>
-    `;
+  } else {
+    const timelineDays = {};
+    
+    jobsThisWeek.forEach(job => {
+      const nextRuns = parseCronToNextRun(job.schedule);
+      nextRuns.forEach(run => {
+        const dayStr = run.toLocaleDateString('en-CA');
+        if (!timelineDays[dayStr]) {
+          timelineDays[dayStr] = [];
+        }
+        timelineDays[dayStr].push({
+          time: run,
+          job: job
+        });
+      });
+    });
+    
+    const todayStr = today.toLocaleDateString('en-CA');
+    
+    const dayKeys = Object.keys(timelineDays).sort((a, b) => {
+      if (a === todayStr) return -1;
+      if (b === todayStr) return 1;
+      return new Date(a) - new Date(b);
+    });
+    
+    const displayDayKeys = state.selectedDay ? dayKeys.filter(d => d === state.selectedDay) : dayKeys;
+    
+    displayDayKeys.forEach(dayStr => {
+      const dayDate = new Date(dayStr + 'T00:00:00');
+      const events = timelineDays[dayStr].sort((a, b) => a.time - b.time);
+      
+      timelineHTML += `
+        <div class="timeline-day">
+          <div class="timeline-day-header">
+            ${dayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+          </div>
+          <div class="timeline-events">
+            ${events.map(e => `
+              <div class="timeline-event">
+                <span class="event-time">${formatTime12Hour(e.time)}</span>
+                <div class="event-info">
+                  <div class="event-name">${e.job.name}</div>
+                  <div class="event-schedule">${cronToEnglish(e.job.schedule)}</div>
+                </div>
+                <div class="event-status ${e.job.status || 'pending'}"></div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    });
+    
+    if (Object.keys(timelineDays).length === 0) {
+      timelineHTML = `
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <p>No scheduled jobs this week</p>
+        </div>
+      `;
+    }
   }
   
   timeline.innerHTML = timelineHTML;
@@ -514,8 +567,8 @@ function updateSystemView() {
     
     // Memory
     if (system.memory) {
-      document.getElementById('memUsage').textContent = `${system.memory.used}GB (${system.memory.percent}%)`;
-      document.getElementById('memFree').textContent = `${system.memory.free}GB`;
+      document.getElementById('memUsage').textContent = `${system.memory.used}MB (${system.memory.percent}%)`;
+      document.getElementById('memFree').textContent = `${system.memory.total - system.memory.used}MB`;
     } else {
       document.getElementById('memUsage').textContent = '--';
       document.getElementById('memFree').textContent = '--';
@@ -530,15 +583,31 @@ function updateSystemView() {
   }
   
   // Remote Systems
-  const remoteList = document.getElementById('remoteSystemsList');
+  // Containers
   const systems = [
-    { name: 'Umbrel (Pi)', status: remoteSystems.umbrel || 'unknown' },
-    { name: 'GO Transit', status: remoteSystems.gotransit || 'unknown' }
+    { name: 'Umbrel (Pi)', ip: '10.0.0.147', port: null, status: remoteSystems.umbrel || 'unknown' },
+    { name: 'GO Transit', ip: '10.0.0.115', port: 3001, status: remoteSystems.gotransit || 'unknown' }
   ];
   
+  // Containers
+  const containersList = document.getElementById('containersList');
+  if (containersList && state.containers && state.containers.containers) {
+    const containers = state.containers.containers;
+    containersList.innerHTML = containers.map(c => {
+      const statusClass = c.status.includes('Up') ? 'running' : (c.status.includes('Restarting') ? 'restarting' : 'stopped');
+      return `<div class="service-item">
+        <span class="service-name">${c.name}</span>
+        <span class="service-status ${statusClass}">
+          ${c.status}
+        </span>
+      </div>`;
+    }).join('');
+  }
+
+  const remoteList = document.getElementById("remoteSystemsList");
   remoteList.innerHTML = systems.map(sys => `
     <div class="service-item">
-      <span class="service-name">${sys.name}</span>
+      <span class="service-name">${sys.name} (${sys.ip}${sys.port ? ':' + sys.port : ''})</span>
       <span class="service-status ${sys.status === 'running' ? 'running' : 'stopped'}">
         ${sys.status || 'unknown'}
       </span>

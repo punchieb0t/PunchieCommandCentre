@@ -79,7 +79,7 @@ function getJobRunsFromSyslog() {
   
   try {
     // Use grep to filter - much faster than reading entire file
-    const output = execSync('grep "CRON.*steve" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -100', { encoding: 'utf8' });
+    const output = execSync('grep "CRON.*steve" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -500', { encoding: 'utf8' });
     const lines = output.trim().split('\n');
     
     for (const line of lines) {
@@ -115,6 +115,31 @@ function getJobRunsFromSyslog() {
   }
   
   return runsMap;
+}
+
+// NEW: Get runs for a specific date
+function getRunsForDate(dateStr) {
+  // dateStr format: YYYY-MM-DD
+  const runsMap = getJobRunsFromSyslog();
+  const runsForDate = [];
+  
+  for (const [cmd, runs] of runsMap.entries()) {
+    for (const run of runs) {
+      const runDate = run.timestamp.split('T')[0]; // Get YYYY-MM-DD from ISO timestamp
+      if (runDate === dateStr) {
+        runsForDate.push({
+          cmd,
+          timestamp: run.timestamp,
+          command: run.command,
+          raw: run.raw
+        });
+      }
+    }
+  }
+  
+  // Sort by timestamp descending
+  runsForDate.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  return runsForDate;
 }
 
 // Check log file for success/failure
@@ -200,18 +225,75 @@ function getJobName(cmd) {
 function getOpenClawJobs() {
   const jobs = [];
   
+  // Helper to convert cron to human readable
+  const cronToHuman = (expr) => {
+    if (!expr) return 'N/A';
+    if (expr.includes('*/')) {
+      const parts = expr.trim().split(/\s+/);
+      if (parts[0].startsWith('*/')) return `Every ${parseInt(parts[0].slice(2))} min`;
+      if (parts[1]?.startsWith('*/')) return `Every ${parseInt(parts[1].slice(2))}h`;
+    }
+    if (expr.match(/^0\s+\*\s+\*\s+\*\s+\*$/)) return 'Every hour';
+    if (expr.match(/^0\s+0\s+\*\s+\*\s+\*$/)) return 'Daily midnight';
+    if (expr.match(/^\d+\s+\d+\s+\*\s+\*\s+\d+$/)) {
+      // Specific times - convert to 12hr
+      const parts = expr.split(/\s+/);
+      let [min, hour, , , dow] = parts;
+      let h = parseInt(hour);
+      const period = h >= 12 ? 'PM' : 'AM';
+      const h12 = h === 0 ? 12 : (h > 12 ? h - 12 : h);
+      const timeStr = `${h12}:${min.padStart(2, '0')} ${period}`;
+      let daysStr = '';
+      if (dow === '*') daysStr = 'Daily';
+      else if (dow === '1-5') daysStr = 'Mon-Fri';
+      else if (dow === '0,6' || dow === '6,0') daysStr = 'Weekends';
+      else {
+        const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        if (dow.includes(',')) daysStr = dow.split(',').map(d => names[parseInt(d)] || d).join(', ');
+        else daysStr = names[parseInt(dow)] || dow;
+      }
+      return `${timeStr} · ${daysStr}`;
+    }
+    return expr;
+  };
+  
+  // Name fixups
+  const nameFixups = {
+    'Multi-chain Wallet Monitor': '💰 Multi-chain Wallet Monitor',
+    'Run: python3 ~/.openclaw/workspace/star-office-ui/update_star_office.py': '⭐ Star Office Updater',
+  };
+  
   try {
     const output = execSync('openclaw cron list --json 2>/dev/null', { encoding: 'utf8', timeout: 10000 });
     const data = JSON.parse(output);
     
     for (const job of data.jobs || []) {
+      let name = job.name || 'Unnamed Job';
+      for (const [k, v] of Object.entries(nameFixups)) {
+        if (name.includes(k) || (job.payload?.message || '').includes(k)) {
+          name = v;
+          break;
+        }
+      }
+      
+      // Get schedule - convert to human readable
+      let schedule = 'N/A';
+      if (job.schedule?.kind === 'cron') {
+        schedule = cronToHuman(job.schedule.expr || '');
+      } else if (job.schedule?.kind === 'every') {
+        const ms = job.schedule.everyMs || 0;
+        schedule = ms >= 3600000 ? `Every ${Math.round(ms/3600000)}h` : `Every ${Math.round(ms/60000)}m`;
+      } else if (job.schedule?.kind === 'at') {
+        schedule = new Date(job.schedule.at).toLocaleString('en-US', { timeZone: 'America/Toronto', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+      }
+      
       jobs.push({
         id: job.id,
-        name: job.name,
+        name,
         type: 'openclaw',
         status: job.state?.lastStatus || 'unknown',
         enabled: job.enabled,
-        schedule: job.schedule?.expr || job.schedule?.at || 'N/A',
+        schedule,
         command: job.payload?.message?.substring(0, 100) || job.payload?.text || 'agentTurn',
         nextRun: job.state?.nextRunAtMs ? new Date(job.state.nextRunAtMs).toLocaleString('en-US', { 
           timeZone: 'America/Toronto',
@@ -359,5 +441,6 @@ module.exports = {
   getSystemCrontabJobs,
   getCronHealth,
   getJobRunsFromSyslog,
+  getRunsForDate,
   checkJobStatus
 };
