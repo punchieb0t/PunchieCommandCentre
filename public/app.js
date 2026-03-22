@@ -6,7 +6,7 @@ const state = {
   backup: null,
   remoteSystems: {},
   containers: { containers: [] },
-  currentWeekStart: getWeekStart(new Date()),
+  currentWeekStart: new Date(new Date().setHours(0,0,0,0)), // Start from today
   currentFilter: 'all',
   selectedDay: null, // For filtering timeline by day
   historicalRuns: [], // For storing actual runs from syslog
