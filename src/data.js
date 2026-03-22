@@ -305,7 +305,8 @@ function getOpenClawJobs() {
   let data;
   const nameFixups = {
     'Multi-chain Wallet Monitor': '💰 Multi-chain Wallet Monitor',
-    'Run: python3 ~/.openclaw/workspace/star-office-ui/update_star_office.py': '⭐ Star Office Updater',
+    'update_status.py': '⭐ Star Office Updater',
+    'update_star_office.py': '⭐ Star Office Updater',
   };
   
   // Use cache to avoid hitting openclaw every time
