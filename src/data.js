@@ -340,9 +340,6 @@ function getOpenClawJobs() {
         runCount: job.state?.runCount || 0,
         runs: []
       });
-    }
-  } catch (err) {
-    console.error('Error fetching OpenClaw jobs:', err.message);
   }
   
   return jobs;
