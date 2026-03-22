@@ -240,7 +240,7 @@ function getOpenClawJobs() {
     }
     if (expr.match(/^0\s+\*\s+\*\s+\*\s+\*$/)) return 'Every hour';
     if (expr.match(/^0\s+0\s+\*\s+\*\s+\*$/)) return 'Daily midnight';
-    if (expr.match(/^\d+\s+\d+\s+\*\s+\*\s+[\d*]+$/)) {
+    if (expr.match(/^\d{1,2}\s+\d{1,2}\s+\*\s+\*\s+[\d\-\*,]+$/)) {
       // Specific times - convert to 12hr
       // OpenClaw stores cron in UTC, convert to EDT (UTC-4)
       const parts = expr.split(/\s+/);
