@@ -487,6 +487,14 @@ body::before {
   white-space: nowrap;
 }
 
+.event-schedule-inline {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 80px;
+}
+
 .event-info {
   flex: 1;
   min-width: 0;

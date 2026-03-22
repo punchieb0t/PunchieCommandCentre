@@ -477,17 +477,39 @@ function updateCalendar() {
     const timelineDays = {};
     
     jobsThisWeek.forEach(job => {
-      const nextRuns = parseCronToNextRun(job.schedule);
-      nextRuns.forEach(run => {
-        const dayStr = run.toLocaleDateString('en-CA');
-        if (!timelineDays[dayStr]) {
-          timelineDays[dayStr] = [];
+      // Check if this is an interval job (Every X min/hr)
+      const isInterval = job.schedule && job.schedule.startsWith('Every ');
+      
+      if (isInterval) {
+        // For interval jobs, show just ONE entry for today
+        const todayStr = today.toLocaleDateString('en-CA');
+        if (!timelineDays[todayStr]) {
+          timelineDays[todayStr] = [];
         }
-        timelineDays[dayStr].push({
-          time: run,
-          job: job
+        // Only add if not already added for this job
+        const alreadyAdded = timelineDays[todayStr].some(e => e.job.name === job.name && e.isInterval);
+        if (!alreadyAdded) {
+          timelineDays[todayStr].push({
+            time: today,
+            job: job,
+            isInterval: true
+          });
+        }
+      } else {
+        // For regular cron jobs, add all scheduled runs
+        const nextRuns = parseCronToNextRun(job.schedule);
+        nextRuns.forEach(run => {
+          const dayStr = run.toLocaleDateString('en-CA');
+          if (!timelineDays[dayStr]) {
+            timelineDays[dayStr] = [];
+          }
+          timelineDays[dayStr].push({
+            time: run,
+            job: job,
+            isInterval: false
+          });
         });
-      });
+      }
     });
     
     const todayStr = today.toLocaleDateString('en-CA');
@@ -512,10 +534,13 @@ function updateCalendar() {
           <div class="timeline-events">
             ${events.map(e => `
               <div class="timeline-event">
-                <span class="event-time">${formatTime12Hour(e.time)}</span>
+                ${e.isInterval 
+                  ? `<span class="event-schedule-inline">${cronToEnglish(e.job.schedule)}</span>`
+                  : `<span class="event-time">${formatTime12Hour(e.time)}</span>`
+                }
                 <div class="event-info">
                   <div class="event-name">${e.job.name}</div>
-                  <div class="event-schedule">${cronToEnglish(e.job.schedule)}</div>
+                  ${!e.isInterval ? `<div class="event-schedule">${cronToEnglish(e.job.schedule)}</div>` : ''}
                 </div>
                 <div class="event-status ${e.job.status || 'pending'}"></div>
               </div>
