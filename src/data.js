@@ -5,6 +5,10 @@ const cronParser = require('cron-parser');
 
 const { CronExpressionParser } = require('cron-parser');
 
+// Cache for openclaw cron list (5 second TTL)
+let openclawCache = { data: null, timestamp: 0 };
+const OPENCLAW_CACHE_TTL = 5000; // 5 seconds
+
 // Get next run time for a cron expression
 function getNextRun(schedule) {
   try {
@@ -78,8 +82,9 @@ function getJobRunsFromSyslog() {
   const runsMap = new Map();
   
   try {
-    // Use grep to filter - much faster than reading entire file
-    const output = execSync('grep "CRON.*steve" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -500', { encoding: 'utf8' });
+    // Use grep with -m to limit results early - much faster than scanning whole file
+    // Also use zgrep for compressed logs and limit to last 200 matches
+    const output = execSync('grep -m 200 "CRON.*steve" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200', { encoding: 'utf8', timeout: 3000 });
     const lines = output.trim().split('\n');
     
     for (const line of lines) {
@@ -258,16 +263,28 @@ function getOpenClawJobs() {
   };
   
   // Name fixups
+  let data;
   const nameFixups = {
     'Multi-chain Wallet Monitor': '💰 Multi-chain Wallet Monitor',
     'Run: python3 ~/.openclaw/workspace/star-office-ui/update_star_office.py': '⭐ Star Office Updater',
   };
   
-  try {
-    const output = execSync('openclaw cron list --json 2>/dev/null', { encoding: 'utf8', timeout: 10000 });
-    const data = JSON.parse(output);
-    
-    for (const job of data.jobs || []) {
+  // Use cache to avoid hitting openclaw every time
+  const now = Date.now();
+  if (openclawCache.data && (now - openclawCache.timestamp) < OPENCLAW_CACHE_TTL) {
+    data = openclawCache.data;
+  } else {
+    try {
+      const output = execSync('openclaw cron list --json 2>/dev/null', { encoding: 'utf8', timeout: 8000 });
+      openclawCache = { data: JSON.parse(output), timestamp: now };
+      data = openclawCache.data;
+    } catch (e) {
+      console.error('Error fetching OpenClaw jobs:', e.message);
+      return jobs;
+    }
+  }
+  
+  for (const job of data.jobs || []) {
       let name = job.name || 'Unnamed Job';
       for (const [k, v] of Object.entries(nameFixups)) {
         if (name.includes(k) || (job.payload?.message || '').includes(k)) {
