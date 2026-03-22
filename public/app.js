@@ -178,28 +178,51 @@ function formatUptime(seconds) {
 }
 
 function parseCronToNextRun(cronExpr) {
-  // Simple cron parser - returns next few run times
+  // Simple cron parser - returns runs for this full week (Mon-Sun)
   if (!cronExpr) return [];
   
-  // Handle human-readable formats
+  // Handle human-readable formats - show runs for entire week
   if (cronExpr.startsWith('Every ')) {
     const runs = [];
-    const now = new Date();
     
     if (cronExpr.includes('min')) {
       const mins = parseInt(cronExpr.match(/\d+/)?.[0] || '5');
-      // Next runs every X minutes
-      for (let i = 1; i <= 10; i++) {
-        const next = new Date(now);
-        next.setMinutes(next.getMinutes() + (mins * i));
-        runs.push(next);
+      // Get start of this week (Monday)
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - daysToMonday);
+      monday.setHours(0, 0, 0, 0);
+      
+      // Generate runs for the full week
+      for (let day = 0; day < 7; day++) {
+        const dayDate = new Date(monday);
+        dayDate.setDate(monday.getDate() + day);
+        for (let h = 0; h < 24; h++) {
+          for (let m = 0; m < 60; m += mins) {
+            const run = new Date(dayDate);
+            run.setHours(h, m, 0, 0);
+            if (run >= now) runs.push(run); // Only future runs for interval jobs
+          }
+        }
       }
     } else if (cronExpr.includes('hour')) {
-      // Next runs every hour at :00
-      for (let i = 1; i <= 10; i++) {
-        const next = new Date(now);
-        next.setHours(next.getHours() + i, 0, 0, 0);
-        runs.push(next);
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - daysToMonday);
+      monday.setHours(0, 0, 0, 0);
+      
+      for (let day = 0; day < 7; day++) {
+        const dayDate = new Date(monday);
+        dayDate.setDate(monday.getDate() + day);
+        for (let h = 0; h < 24; h++) {
+          const run = new Date(dayDate);
+          run.setHours(h, 0, 0, 0);
+          if (run >= now) runs.push(run);
+        }
       }
     }
     
@@ -213,8 +236,17 @@ function parseCronToNextRun(cronExpr) {
   const runs = [];
   const now = new Date();
   
-  for (let i = 0; i < 21; i++) {  // Extended from 14 to 21 days to catch more runs
-    const checkDate = addDays(now, i);
+  // Get start of this week (Monday)
+  const dayOfWeek = now.getDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - daysToMonday);
+  monday.setHours(0, 0, 0, 0);
+  
+  // Generate runs for the full week (Mon-Sun)
+  for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    const checkDate = new Date(monday);
+    checkDate.setDate(monday.getDate() + dayOffset);
     const dayOfWeek = checkDate.getDay();
     const dayOfMonth = checkDate.getDate();
     const currentMonth = checkDate.getMonth() + 1;
