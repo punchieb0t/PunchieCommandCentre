@@ -181,6 +181,31 @@ function parseCronToNextRun(cronExpr) {
   // Simple cron parser - returns next few run times
   if (!cronExpr) return [];
   
+  // Handle human-readable formats
+  if (cronExpr.startsWith('Every ')) {
+    const runs = [];
+    const now = new Date();
+    
+    if (cronExpr.includes('min')) {
+      const mins = parseInt(cronExpr.match(/\d+/)?.[0] || '5');
+      // Next runs every X minutes
+      for (let i = 1; i <= 10; i++) {
+        const next = new Date(now);
+        next.setMinutes(next.getMinutes() + (mins * i));
+        runs.push(next);
+      }
+    } else if (cronExpr.includes('hour')) {
+      // Next runs every hour at :00
+      for (let i = 1; i <= 10; i++) {
+        const next = new Date(now);
+        next.setHours(next.getHours() + i, 0, 0, 0);
+        runs.push(next);
+      }
+    }
+    
+    return runs;
+  }
+  
   const parts = cronExpr.split(' ');
   if (parts.length < 5) return [];
   
