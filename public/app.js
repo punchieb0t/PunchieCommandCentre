@@ -181,6 +181,52 @@ function parseCronToNextRun(cronExpr, weekStart) {
   // Simple cron parser - returns runs for this full week
   if (!cronExpr) return [];
   
+  // Handle human-readable format from backend (e.g., "9:45 PM · Daily", "7:25 AM · Mon-Fri")
+  if (cronExpr.includes('·')) {
+    const parts = cronExpr.split('·').map(p => p.trim());
+    const timePart = parts[0];
+    const daysPart = parts[1] || '';
+    
+    // Parse time "9:45 PM" -> hour, minute
+    const timeMatch = timePart.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (timeMatch) {
+      let hour = parseInt(timeMatch[1]);
+      const minute = parseInt(timeMatch[2]);
+      const period = timeMatch[3].toUpperCase();
+      if (period === 'PM' && hour !== 12) hour += 12;
+      if (period === 'AM' && hour === 12) hour = 0;
+      
+      // Determine which days match
+      const runs = [];
+      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+        const checkDate = new Date(weekStart);
+        checkDate.setDate(weekStart.getDate() + dayOffset);
+        const dayOfWeek = checkDate.getDay();
+        
+        let matches = false;
+        if (daysPart === 'Daily') matches = true;
+        else if (daysPart === 'Mon-Fri') matches = dayOfWeek >= 1 && dayOfWeek <= 5;
+        else if (daysPart === 'Weekends') matches = dayOfWeek === 0 || dayOfWeek === 6;
+        else {
+          // Parse day names
+          const dayNames = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+          for (const [name, num] of Object.entries(dayNames)) {
+            if (daysPart.includes(name)) {
+              if (dayOfWeek === num) { matches = true; break; }
+            }
+          }
+        }
+        
+        if (matches) {
+          const runDate = new Date(checkDate);
+          runDate.setHours(hour, minute, 0, 0);
+          runs.push(runDate);
+        }
+      }
+      return runs;
+    }
+  }
+  
   // Use provided weekStart or calculate from today
   const refDate = weekStart || new Date();
   
