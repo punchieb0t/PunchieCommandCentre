@@ -33,6 +33,39 @@ function getNextRun(schedule) {
 }
 
 // Parse system crontab - THE SOURCE OF TRUTH
+// Convert system crontab to human readable (no timezone conversion needed - system is in EDT)
+function cronToHumanSystem(expr) {
+  if (!expr) return expr;
+  if (expr.startsWith('@reboot')) return 'On Reboot';
+  if (expr.includes('*/')) {
+    const parts = expr.trim().split(/\s+/);
+    if (parts[0].startsWith('*/')) return `Every ${parseInt(parts[0].slice(2))} min`;
+    if (parts[1]?.startsWith('*/')) return `Every ${parseInt(parts[1].slice(2))}h`;
+  }
+  const match = expr.match(/^(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)$/);
+  if (match) {
+    const [_, min, hour, dom, month, dow] = match;
+    let h = parseInt(hour);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const h12 = h === 0 ? 12 : (h > 12 ? h - 12 : h);
+    const timeStr = `${h12}:${min.padStart(2, '0')} ${period}`;
+    let daysStr = '';
+    if (dow === '*' && dom === '*') daysStr = 'Daily';
+    else if (dow === '1-5') daysStr = 'Mon-Fri';
+    else if (dow === '0,6' || dow === '6,0') daysStr = 'Weekends';
+    else if (dom.startsWith('*/')) daysStr = `Every ${dom.slice(2)} months`;
+    else if (dom !== '*' && dow === '*') daysStr = `Day ${dom}`;
+    else {
+      const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      if (dow.includes(',')) daysStr = dow.split(',').map(d => names[parseInt(d)] || d).join(', ');
+      else if (dow !== '*') daysStr = names[parseInt(dow)] || dow;
+      else daysStr = 'Daily';
+    }
+    return `${timeStr} · ${daysStr}`;
+  }
+  return expr;
+}
+
 function getSystemCrontabJobs() {
   const jobs = [];
   
@@ -59,7 +92,7 @@ function getSystemCrontabJobs() {
           type: 'scheduled',  // Changed from 'system-crontab' - more intuitive
           status: 'scheduled',  // Yellow dot = scheduled to run
           enabled: true,
-          schedule,
+          schedule: cronToHumanSystem(schedule),
           command: cmd,
           nextRun: getNextRun(schedule),
           lastRun: null,
