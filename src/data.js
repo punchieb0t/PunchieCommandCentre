@@ -242,9 +242,15 @@ function getOpenClawJobs() {
     if (expr.match(/^0\s+0\s+\*\s+\*\s+\*$/)) return 'Daily midnight';
     if (expr.match(/^\d+\s+\d+\s+\*\s+\*\s+\d+$/)) {
       // Specific times - convert to 12hr
+      // OpenClaw stores cron in UTC, convert to EDT (UTC-4)
       const parts = expr.split(/\s+/);
       let [min, hour, , , dow] = parts;
       let h = parseInt(hour);
+      
+      // Convert UTC to EDT (UTC-4)
+      h = h - 4;
+      if (h < 0) h += 24;
+      
       const period = h >= 12 ? 'PM' : 'AM';
       const h12 = h === 0 ? 12 : (h > 12 ? h - 12 : h);
       const timeStr = `${h12}:${min.padStart(2, '0')} ${period}`;
