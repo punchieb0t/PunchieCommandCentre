@@ -259,14 +259,11 @@ function parseCronToNextRun(cronExpr, weekStart) {
       const m = min === '*' ? 0 : parseInt(min) || 0;
       const runDate = new Date(checkDate);
       runDate.setHours(h, m, 0, 0);
-      
-      if (runDate > now) {
-        runs.push(runDate);
-      }
+      runs.push(runDate);
     }
   }
   
-  return runs.slice(0, 10);  // Return up to 10 runs instead of 5
+  return runs;
 }
 
 // ===== API Calls =====
@@ -431,15 +428,12 @@ function updateCalendar() {
     const dayStr = day.toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
     const isToday = day.getTime() === today.getTime();
     
-    // Count jobs scheduled for this day
+    // Count unique jobs that have at least one run on this day
     let jobCount = 0;
     jobsThisWeek.forEach(job => {
-      const nextRuns = parseCronToNextRun(job.schedule, state.currentWeekStart);
-      nextRuns.forEach(run => {
-        if (run.toLocaleDateString('en-CA') === dayStr) {
-          jobCount++;
-        }
-      });
+      const runs = parseCronToNextRun(job.schedule, state.currentWeekStart);
+      const hasRunOnDay = runs.some(run => run.toLocaleDateString('en-CA') === dayStr);
+      if (hasRunOnDay) jobCount++;
     });
     
     const isSelected = state.selectedDay === dayStr;
