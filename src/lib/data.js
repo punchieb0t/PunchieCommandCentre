@@ -1,6 +1,7 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 const cronParser = require('cron-parser');
+const TORONTO_TZ = 'America/Toronto';
 
 // Get next run time for a cron expression
 function getNextRun(schedule) {
@@ -284,14 +285,85 @@ function getAllJobs() {
     }
   }
   
-  // Add OpenClaw jobs
+  // cronToHuman helper
+  const cronToHuman = (expr) => {
+    if (!expr) return expr;
+    if (expr.includes('*/')) {
+      const parts = expr.trim().split(/\s+/);
+      if (parts[0].startsWith('*/')) return `Every ${parseInt(parts[0].slice(2))} min`;
+      if (parts[1]?.startsWith('*/')) return `Every ${parseInt(parts[1].slice(2))}h`;
+    }
+    if (expr.match(/^0\s+\*\s+\*\s+\*\s+\*$/)) return 'Every hour';
+    const parts = expr.trim().split(/\s+/);
+    if (parts.length >= 5) {
+      let [min, hour, , , dow] = parts;
+      const isUTC = expr.includes('@ UTC');
+      let h = parseInt(hour);
+      if (isUTC && !isNaN(h)) { h = h - 4; if (h < 0) h += 24; }
+      const period = h >= 12 ? 'PM' : 'AM';
+      const h12 = h === 0 ? 12 : (h > 12 ? h - 12 : h);
+      const timeStr = `${h12}:${min.padStart(2, '0')} ${period}`;
+      let daysStr = '';
+      if (dow === '*') daysStr = 'Daily';
+      else if (dow === '1-5') daysStr = 'Mon-Fri';
+      else if (dow === '0,6' || dow === '6,0') daysStr = 'Weekends';
+      else {
+        const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        if (dow.includes(',')) daysStr = dow.split(',').map(d => names[parseInt(d)] || d).join(', ');
+        else daysStr = names[parseInt(dow)] || dow;
+      }
+      return `${timeStr} · ${daysStr}`;
+    }
+    return expr;
+  };
+  
+  const openclawNameFixups = {
+    'update_star_office': '⭐ Star Office Updater',
+    'Multi-chain Wallet Monitor': '💰 Multi-chain Wallet Monitor',
+  };
+  
+  // Add OpenClaw jobs (inlined)
   try {
-    const { getOpenClawJobs } = require('./openclaw');
-    const openclawJobs = getOpenClawJobs();
-    jobs = [...jobs, ...openclawJobs];
-  } catch (e) {
-    console.error('Error loading OpenClaw jobs:', e.message);
-  }
+    const output = execSync('openclaw cron list --json 2>/dev/null', { encoding: 'utf8', timeout: 10000 });
+    const ocData = JSON.parse(output);
+    for (const job of (ocData.jobs || [])) {
+      const sched = job.schedule || {};
+      const kind = sched.kind || 'unknown';
+      let schedStr = '', nextRun = 'N/A';
+      const status = job.state?.lastRunStatus || 'unknown';
+      if (kind === 'cron') {
+        schedStr = cronToHuman(sched.expr || '');
+        try {
+          const utcH = parseInt((sched.expr || '').split(/\s+/)[1] || 0);
+          const utcM = parseInt((sched.expr || '').split(/\s+/)[0] || 0);
+          const nd = new Date();
+          nd.setUTCHours(utcH, utcM, 0, 0);
+          if (nd <= new Date()) {
+            if ((sched.expr || '').includes('*/')) nd.setTime(nd.getTime() + (parseInt((sched.expr || '').match(/\/\/(\d+)/)?.[1] || 60) * 60000));
+            else nd.setDate(nd.getDate() + 1);
+          }
+          nextRun = nd.toLocaleString('en-US', { timeZone: TORONTO_TZ, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+        } catch(e) {}
+      } else if (kind === 'every') {
+        const ms = sched.everyMs || 0;
+        schedStr = ms >= 3600000 ? `Every ${Math.round(ms/3600000)}h` : `Every ${Math.round(ms/60000)}m`;
+        try { nextRun = new Date(new Date().getTime() + ms).toLocaleString('en-US', { timeZone: TORONTO_TZ, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); } catch(e) {}
+      } else if (kind === 'at') {
+        try { const dt = new Date(sched.at); nextRun = dt.toLocaleString('en-US', { timeZone: TORONTO_TZ, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); schedStr = nextRun; } catch(e) { schedStr = sched.at || 'one-shot'; }
+      }
+      let name = job.name || 'Unnamed Job';
+      for (const [k, v] of Object.entries(openclawNameFixups)) if (name.includes(k) || (job.payload?.message || '').includes(k)) { name = v; break; }
+      if (name.startsWith('Run: python3')) name = '🔧 Python Script';
+      jobs.push({
+        id: job.id || 'unknown', name, type: 'openclaw',
+        status: status === 'ok' ? 'done' : status,
+        enabled: job.enabled !== false, schedule: schedStr,
+        command: (job.payload?.message || '').slice(0, 80), nextRun,
+        lastRun: job.state?.lastRunAtMs ? new Date(job.state.lastRunAtMs).toLocaleString('en-US', { timeZone: TORONTO_TZ, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : null,
+        lastStatus: status, runCount: 0, runs: []
+      });
+    }
+  } catch (e) { console.error('Error loading OpenClaw jobs:', e.message); }
   
   const enabled = jobs.filter(j => j.enabled).length;
   const disabled = jobs.filter(j => !j.enabled).length;
