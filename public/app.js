@@ -177,9 +177,12 @@ function formatUptime(seconds) {
   return `${mins}m`;
 }
 
-function parseCronToNextRun(cronExpr) {
-  // Simple cron parser - returns runs for this full week (Mon-Sun)
+function parseCronToNextRun(cronExpr, weekStart) {
+  // Simple cron parser - returns runs for this full week
   if (!cronExpr) return [];
+  
+  // Use provided weekStart or calculate from today
+  const refDate = weekStart || new Date();
   
   // Handle human-readable formats - show runs for entire week
   if (cronExpr.startsWith('Every ')) {
@@ -187,41 +190,26 @@ function parseCronToNextRun(cronExpr) {
     
     if (cronExpr.includes('min')) {
       const mins = parseInt(cronExpr.match(/\d+/)?.[0] || '5');
-      // Get start of this week (Monday)
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      const monday = new Date(now);
-      monday.setDate(now.getDate() - daysToMonday);
-      monday.setHours(0, 0, 0, 0);
-      
-      // Generate runs for the full week
+      // Generate runs for the full week starting from weekStart
       for (let day = 0; day < 7; day++) {
-        const dayDate = new Date(monday);
-        dayDate.setDate(monday.getDate() + day);
+        const dayDate = new Date(weekStart);
+        dayDate.setDate(weekStart.getDate() + day);
         for (let h = 0; h < 24; h++) {
           for (let m = 0; m < 60; m += mins) {
             const run = new Date(dayDate);
             run.setHours(h, m, 0, 0);
-            if (run >= now) runs.push(run); // Only future runs for interval jobs
+            runs.push(run);
           }
         }
       }
     } else if (cronExpr.includes('hour')) {
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      const monday = new Date(now);
-      monday.setDate(now.getDate() - daysToMonday);
-      monday.setHours(0, 0, 0, 0);
-      
       for (let day = 0; day < 7; day++) {
-        const dayDate = new Date(monday);
-        dayDate.setDate(monday.getDate() + day);
+        const dayDate = new Date(weekStart);
+        dayDate.setDate(weekStart.getDate() + day);
         for (let h = 0; h < 24; h++) {
           const run = new Date(dayDate);
           run.setHours(h, 0, 0, 0);
-          if (run >= now) runs.push(run);
+          runs.push(run);
         }
       }
     }
@@ -234,19 +222,11 @@ function parseCronToNextRun(cronExpr) {
   
   const [min, hour, day, month, weekday] = parts;
   const runs = [];
-  const now = new Date();
   
-  // Get start of this week (Monday)
-  const dayOfWeek = now.getDay();
-  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - daysToMonday);
-  monday.setHours(0, 0, 0, 0);
-  
-  // Generate runs for the full week (Mon-Sun)
+  // Generate runs for the full week (7 days starting from weekStart)
   for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-    const checkDate = new Date(monday);
-    checkDate.setDate(monday.getDate() + dayOffset);
+    const checkDate = new Date(weekStart);
+    checkDate.setDate(weekStart.getDate() + dayOffset);
     const dayOfWeek = checkDate.getDay();
     const dayOfMonth = checkDate.getDate();
     const currentMonth = checkDate.getMonth() + 1;
@@ -454,7 +434,7 @@ function updateCalendar() {
     // Count jobs scheduled for this day
     let jobCount = 0;
     jobsThisWeek.forEach(job => {
-      const nextRuns = parseCronToNextRun(job.schedule);
+      const nextRuns = parseCronToNextRun(job.schedule, state.currentWeekStart);
       nextRuns.forEach(run => {
         if (run.toLocaleDateString('en-CA') === dayStr) {
           jobCount++;
@@ -529,7 +509,7 @@ function updateCalendar() {
         }
       } else {
         // For regular cron jobs, add all scheduled runs
-        const nextRuns = parseCronToNextRun(job.schedule);
+        const nextRuns = parseCronToNextRun(job.schedule, state.currentWeekStart);
         nextRuns.forEach(run => {
           const dayStr = run.toLocaleDateString('en-CA');
           if (!timelineDays[dayStr]) {
