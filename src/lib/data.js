@@ -284,6 +284,15 @@ function getAllJobs() {
     }
   }
   
+  // Add OpenClaw jobs
+  try {
+    const { getOpenClawJobs } = require('./openclaw');
+    const openclawJobs = getOpenClawJobs();
+    jobs = [...jobs, ...openclawJobs];
+  } catch (e) {
+    console.error('Error loading OpenClaw jobs:', e.message);
+  }
+  
   const enabled = jobs.filter(j => j.enabled).length;
   const disabled = jobs.filter(j => !j.enabled).length;
   
