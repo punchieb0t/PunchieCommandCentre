@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const { getAllJobs, getJobLogs, getRunsForDate } = require('./src/data');
+const { getAllJobs, getJobLogs, getRunsForDate, getOpenClawJobRuns } = require('./src/data');
 const { getSystemStats, getCryptoPrices, getWeather, getBackupStatus, getServices } = require('./src/status');
 const { getUmbrelStatus } = require('./src/umbrel');
 const { getUmbrelContainers } = require('./src/status');
@@ -40,6 +40,17 @@ app.get('/api/runs/:date', (req, res) => {
     const { date } = req.params;
     const runs = getRunsForDate(date);
     res.json({ date, runs });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get run history for a specific OpenClaw job (on-demand)
+app.get('/api/jobs/:id/runs', (req, res) => {
+  try {
+    const { id } = req.params;
+    const runs = getOpenClawJobRuns(id);
+    res.json({ jobId: id, runs });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -170,17 +181,17 @@ app.get('/api/gotransit', (req, res) => {
     });
     
     req2.on('error', () => {
-      res.json({ status: 'stopped' });
+      if (!res.headersSent) res.json({ status: 'stopped' });
     });
     
     req2.on('timeout', () => {
       req2.destroy();
-      res.json({ status: 'stopped' });
+      if (!res.headersSent) res.json({ status: 'stopped' });
     });
     
     req2.end();
   } catch (e) {
-    res.json({ status: 'stopped' });
+    if (!res.headersSent) res.json({ status: 'stopped' });
   }
 });
 

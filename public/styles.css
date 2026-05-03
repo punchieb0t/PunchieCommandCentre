@@ -382,6 +382,25 @@ body::before {
   white-space: nowrap;
 }
 
+.scheduled-tasks {
+  margin-bottom: 24px;
+}
+
+.scheduled-tasks-header {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.scheduled-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* Week Grid */
 .week-grid {
   display: grid;
@@ -523,6 +542,10 @@ body::before {
   font-family: var(--font-mono);
 }
 
+.scheduled-task .event-time {
+  min-width: 110px;
+}
+
 .event-status {
   width: 8px;
   height: 8px;
@@ -533,6 +556,73 @@ body::before {
 .event-status.success { background: var(--success); box-shadow: 0 0 8px var(--success); }
 .event-status.failed { background: var(--error); box-shadow: 0 0 8px var(--error); }
 .event-status.pending { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
+
+/* Pulse animations for live status indicators */
+@keyframes pulse-success {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+}
+
+@keyframes pulse-running {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+  50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+}
+
+@keyframes pulse-failed {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+.event-status.running {
+  background: var(--warning) !important;
+  box-shadow: 0 0 8px var(--warning) !important;
+  animation: pulse-running 1.5s infinite !important;
+}
+
+.event-status.success {
+  animation: pulse-success 2s infinite !important;
+}
+
+.event-status.failed {
+  animation: pulse-failed 2s infinite !important;
+}
+
+/* Job row status indicator */
+.job-row .event-status {
+  width: 10px;
+  height: 10px;
+}
+
+/* Status badge for job detail */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-left: 8px;
+  animation: fade-badge 5s forwards;
+}
+
+.status-badge.success { background: var(--success-dim); color: var(--success); }
+.status-badge.failed { background: var(--error-dim); color: var(--error); }
+.status-badge.running { background: var(--warning-dim); color: var(--warning); }
+.status-badge.pending { background: rgba(96, 96, 112, 0.2); color: var(--text-muted); }
+.status-badge.unknown { background: rgba(96, 96, 112, 0.2); color: var(--text-muted); }
+.status-badge.error { background: var(--error-dim); color: var(--error); }
+.status-badge.ok { background: var(--success-dim); color: var(--success); }
+
+.event-status.pending { background: var(--text-muted); box-shadow: none; }
+.event-status.unknown { background: var(--text-muted); box-shadow: none; }
+.event-status.error { background: var(--error); box-shadow: 0 0 8px var(--error); }
+.event-status.ok { background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+@keyframes fade-badge {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
 
 /* ===== Jobs List ===== */
 .job-filters {

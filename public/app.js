@@ -1,3 +1,9 @@
+// Strip emojis from job names for display
+function stripEmoji(text) {
+  if (!text) return '';
+  return text.replace(/[\u{1F600}-\u{1F6FF}\u{1F300}-\u{1F5FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+}
+
 // ===== State =====
 const state = {
   system: null,
@@ -6,7 +12,18 @@ const state = {
   backup: null,
   remoteSystems: {},
   containers: { containers: [] },
-  currentWeekStart: new Date(new Date().setHours(0,0,0,0)), // Start from today
+  currentWeekStart: (() => {
+  // Calculate current week's Monday in EST
+  const now = new Date();
+  const estNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Toronto' }));
+  const dayOfWeek = estNow.getDay(); // 0=Sun in JS
+  // Monday = 1, so daysSinceMonday = (dayOfWeek - 1 + 7) % 7
+  const daysSinceMonday = (dayOfWeek - 1 + 7) % 7;
+  const mondayEst = new Date(estNow);
+  mondayEst.setDate(estNow.getDate() - daysSinceMonday);
+  mondayEst.setHours(0, 0, 0, 0);
+  return mondayEst;
+})(),
   currentFilter: 'all',
   selectedDay: null, // For filtering timeline by day
   historicalRuns: [], // For storing actual runs from syslog
@@ -123,49 +140,173 @@ function formatTime12Hour(date) {
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
-// Convert cron to plain English
-function cronToEnglish(cron) {
-  const parts = cron.split(' ');
-  if (parts.length < 5) return cron;
-  
-  const [min, hour, , , dow] = parts;
-  
-  // Daily at specific time
-  if (min !== '*' && hour !== '*' && dow === '*') {
-    const h = parseInt(hour);
-    const m = min === '0' ? '' : `:${min}`;
-    const period = h >= 12 ? 'PM' : 'AM';
-    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    return `Daily at ${h12}${m} ${period}`;
-  }
-  
-  // Every X minutes
-  if (min.includes('/')) {
-    const interval = min.split('/')[1];
-    return `Every ${interval} minutes`;
-  }
-  
-  // Specific days
-  if (dow !== '*' && !dow.includes(',')) {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayName = days[parseInt(dow)] || dow;
-    if (min !== '*' && hour !== '*') {
-      const h = parseInt(hour);
-      const m = min === '0' ? '' : `:${min}`;
-      const period = h >= 12 ? 'PM' : 'AM';
-      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-      return `Every ${dayName} at ${h12}${m} ${period}`;
+function formatScheduleAt(scheduleAt) {
+  if (!scheduleAt) return '';
+  const dateOnlyMatch = scheduleAt.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const parsed = dateOnlyMatch
+    ? new Date(
+        Number.parseInt(dateOnlyMatch[1], 10),
+        Number.parseInt(dateOnlyMatch[2], 10) - 1,
+        Number.parseInt(dateOnlyMatch[3], 10)
+      )
+    : new Date(scheduleAt);
+  if (Number.isNaN(parsed.getTime())) return scheduleAt;
+  return parsed.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+
+// Convert cron-like schedule values to readable text
+function cronToEnglish(schedule) {
+  if (!schedule || typeof schedule !== 'string') return schedule || '';
+  const value = schedule.trim();
+  if (!value) return '';
+
+  if (value.includes('·')) return value;
+  if (value.startsWith('Every ')) {
+    const intervalMatch = value.match(/^Every\s+(\d+)\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours)$/i);
+    if (!intervalMatch) return value;
+
+    const amount = Number.parseInt(intervalMatch[1], 10);
+    const unit = intervalMatch[2].toLowerCase();
+    if (Number.isNaN(amount)) return value;
+    if (['m', 'min', 'mins', 'minute', 'minutes'].includes(unit)) return `Every ${amount} min`;
+    if (['h', 'hr', 'hrs', 'hour', 'hours'].includes(unit)) {
+      if (amount >= 24 && amount % 24 === 0) {
+        const days = amount / 24;
+        return `Every ${days} day${days === 1 ? '' : 's'}`;
+      }
+      return `Every ${amount}h`;
     }
-    return `Every ${dayName}`;
+    return value;
   }
-  
-  return cron;
+
+  if (/^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/.test(value)) {
+    return formatScheduleAt(value);
+  }
+
+  if (value === '@reboot') return 'On Reboot';
+
+  const parts = value.split(/\s+/);
+  if (parts.length !== 5) return value;
+
+  const [min, hour, dom, , dow] = parts;
+
+  if (min.startsWith('*/')) {
+    const amount = Number.parseInt(min.slice(2), 10);
+    return Number.isNaN(amount) ? value : `Every ${amount} min`;
+  }
+
+  if (hour.startsWith('*/')) {
+    const amount = Number.parseInt(hour.slice(2), 10);
+    if (Number.isNaN(amount)) return value;
+    if (amount >= 24 && amount % 24 === 0) {
+      const days = amount / 24;
+      return `Every ${days} day${days === 1 ? '' : 's'}`;
+    }
+    return `Every ${amount}h`;
+  }
+
+  const minute = Number.parseInt(min, 10);
+  const hour24 = Number.parseInt(hour, 10);
+  if (Number.isNaN(minute) || Number.isNaN(hour24)) return value;
+
+  const time = new Date();
+  time.setHours(hour24, minute, 0, 0);
+  const timeLabel = time.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const formatDow = (segment) => {
+    if (segment === '*') return 'Daily';
+    if (segment === '1-5') return 'Mon-Fri';
+    if (segment === '0,6' || segment === '6,0') return 'Weekends';
+
+    return segment.split(',').map((token) => {
+      if (token.includes('-')) {
+        const [start, end] = token.split('-').map((part) => Number.parseInt(part, 10));
+        if (Number.isNaN(start) || Number.isNaN(end)) return token;
+        return `${dayNames[start] || token.split('-')[0]}-${dayNames[end] || token.split('-')[1]}`;
+      }
+      const dayIndex = Number.parseInt(token, 10);
+      return Number.isNaN(dayIndex) ? token : (dayNames[dayIndex] || token);
+    }).join(', ');
+  };
+
+  let cadence = 'Daily';
+  if (dom !== '*' && dow === '*') cadence = `Day ${dom}`;
+  else if (dow !== '*') cadence = formatDow(dow);
+
+  return `${timeLabel} · ${cadence}`;
+}
+
+function getScheduleDisplay(job) {
+  if (job?.scheduleKind === 'at') {
+    return formatScheduleAt(job.scheduleAt || job.schedule);
+  }
+  return cronToEnglish(job?.schedule || '');
 }
 
 function addDays(date, days) {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
+}
+
+function getDateKey(date) {
+  // Always use EST timezone for display consistency
+  return date.toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
+}
+
+function formatTime12Hour(date) {
+  return date.toLocaleTimeString('en-US', { timeZone: 'America/Toronto', hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+function toEST(date) {
+  return new Date(date.toLocaleString("en-US", { timeZone: "America/Toronto" }));
+}
+
+function isDateWithinWeek(date, weekStart) {
+  const dateEST = toEST(date);
+  const wsEST = toEST(weekStart);
+  const weekEnd = addDays(wsEST, 7);
+  return dateEST >= wsEST && dateEST < weekEnd;
+}
+
+function getRecurringRunsForWeek(job, weekStart) {
+  const schedule = job.schedule || '';
+  
+  // For interval jobs (every X min/hr), show ONE entry only with the repeat frequency
+  if (schedule.startsWith('Every ') || schedule.includes('*/')) {
+    // This is an interval job - don't expand, show once
+    const nextRun = job.nextRun ? new Date(job.nextRun) : new Date();
+    if (!Number.isNaN(nextRun.getTime()) && isDateWithinWeek(nextRun, weekStart)) {
+      return [nextRun];
+    }
+    return [];
+  }
+  
+  // For cron-based jobs, parse and expand runs for the week
+  const parsedRuns = parseCronToNextRun(job.schedule, weekStart)
+    .filter((run) => !Number.isNaN(run.getTime()) && isDateWithinWeek(run, weekStart));
+
+  if (parsedRuns.length > 0) {
+    return parsedRuns;
+  }
+
+  const fallbackRun = new Date(job.nextRun);
+  if (!Number.isNaN(fallbackRun.getTime()) && isDateWithinWeek(fallbackRun, weekStart)) {
+    return [fallbackRun];
+  }
+
+  return [];
 }
 
 function formatUptime(seconds) {
@@ -457,6 +598,7 @@ function updateCalendar() {
   const weekGrid = document.getElementById('weekGrid');
   const weekRange = document.getElementById('weekRange');
   const timeline = document.getElementById('timeline');
+  const scheduledTasks = document.getElementById('scheduledTasks');
   
   // Update week range text
   const weekEnd = addDays(state.currentWeekStart, 6);
@@ -467,20 +609,96 @@ function updateCalendar() {
   today.setHours(0, 0, 0, 0);
   
   let weekHTML = '';
-  const jobsThisWeek = [...(state.jobs.system || []), ...(state.jobs.openclaw || [])];
+  const allJobs = [...(state.jobs.system || []), ...(state.jobs.openclaw || [])];
+  const recurringJobs = allJobs.filter(job => job.scheduleKind !== 'at');
+  const oneShotJobs = allJobs.filter(job => job.scheduleKind === 'at' && job.scheduleAt);
+  const recurringJobsByDay = new Map();
+
+  recurringJobs.forEach((job) => {
+    const runs = getRecurringRunsForWeek(job, state.currentWeekStart);
+    runs.forEach((run) => {
+      const dayStr = getDateKey(run);
+      if (!recurringJobsByDay.has(dayStr)) {
+        recurringJobsByDay.set(dayStr, []);
+      }
+      recurringJobsByDay.get(dayStr).push({ job, run });
+    });
+  });
+
+  for (const entries of recurringJobsByDay.values()) {
+    entries.sort((a, b) => a.run - b.run || stripEmoji(a.job.name).localeCompare(stripEmoji(b.job.name)));
+  }
+
+  const scheduledTaskSections = [];
+  for (let i = 0; i < 7; i++) {
+    const day = addDays(state.currentWeekStart, i);
+    const dayStr = getDateKey(day);
+    const entries = recurringJobsByDay.get(dayStr) || [];
+
+    if (entries.length === 0) {
+      continue;
+    }
+
+    scheduledTaskSections.push(`
+      <div class="timeline-day">
+        <div class="timeline-day-header">
+          ${day.toLocaleDateString('en-US', { weekday: 'long' })}
+        </div>
+        <div class="timeline-events">
+          ${entries.map(({ job, run }) => {
+            const isInterval = (job.schedule || '').startsWith('Every ') || (job.schedule || '').includes('*/');
+            const timeLabel = isInterval ? getScheduleDisplay(job) : formatTime12Hour(run);
+            // Map OpenClaw status to CSS class: ok→success, error→failed, unknown→pending, running stays running
+            const statusMap = { 'ok': 'success', 'error': 'failed', 'unknown': 'pending', 'running': 'running', 'failed': 'failed', 'success': 'success' };
+            const statusClass = statusMap[job.status] || 'pending';
+            // Only show status badge if the job has actually run before (lastRun !== 'never')
+            // This prevents showing badges for future-only jobs that haven't run yet
+            const hasRunHistory = job.lastRun && job.lastRun !== 'never';
+            const statusBadge = (job.status && job.status !== 'unknown' && hasRunHistory) ? `<span class="status-badge ${statusClass}">${job.status}</span>` : '';
+            return `
+            <div class="timeline-event scheduled-task">
+              <span class="event-time">${timeLabel}</span>
+              <div class="event-info">
+                <div class="event-name">${stripEmoji(job.name)}${statusBadge}</div>
+                <div class="event-schedule">${job.type}</div>
+              </div>
+              <div class="event-status ${statusClass}"></div>
+            </div>
+          `}).join('')}
+        </div>
+      </div>
+    `);
+  }
+
+  scheduledTasks.innerHTML = scheduledTaskSections.length > 0 ? `
+    <div class="scheduled-tasks-list">
+      ${scheduledTaskSections.join('')}
+    </div>
+  ` : `
+    <div class="empty-state">
+      <p>No recurring scheduled tasks</p>
+    </div>
+  `;
   
   for (let i = 0; i < 7; i++) {
     const day = addDays(state.currentWeekStart, i);
-    const dayStr = day.toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
+    const dayStr = getDateKey(day);
     const isToday = day.getTime() === today.getTime();
     
-    // Count unique jobs that have at least one run on this day
-    let jobCount = 0;
-    jobsThisWeek.forEach(job => {
-      const runs = parseCronToNextRun(job.schedule, state.currentWeekStart);
-      const hasRunOnDay = runs.some(run => run.toLocaleDateString('en-CA') === dayStr);
-      if (hasRunOnDay) jobCount++;
+    const jobsForDay = new Set();
+
+    oneShotJobs.forEach(job => {
+      const run = new Date(job.scheduleAt);
+      if (!Number.isNaN(run.getTime()) && getDateKey(run) === dayStr) {
+        jobsForDay.add(job.id || `${job.name}-${job.scheduleAt}`);
+      }
     });
+
+    (recurringJobsByDay.get(dayStr) || []).forEach(({ job }) => {
+      jobsForDay.add(job.id || `${job.name}-${job.schedule}`);
+    });
+
+    const jobCount = jobsForDay.size;
     
     const isSelected = state.selectedDay === dayStr;
     
@@ -528,40 +746,20 @@ function updateCalendar() {
   } else {
     const timelineDays = {};
     
-    jobsThisWeek.forEach(job => {
-      // Check if this is an interval job (Every X min/hr)
-      const isInterval = job.schedule && job.schedule.startsWith('Every ');
-      
-      if (isInterval) {
-        // For interval jobs, show just ONE entry for today
-        const todayStr = today.toLocaleDateString('en-CA');
-        if (!timelineDays[todayStr]) {
-          timelineDays[todayStr] = [];
-        }
-        // Only add if not already added for this job
-        const alreadyAdded = timelineDays[todayStr].some(e => e.job.name === job.name && e.isInterval);
-        if (!alreadyAdded) {
-          timelineDays[todayStr].push({
-            time: today,
-            job: job,
-            isInterval: true
-          });
-        }
-      } else {
-        // For regular cron jobs, add all scheduled runs
-        const nextRuns = parseCronToNextRun(job.schedule, state.currentWeekStart);
-        nextRuns.forEach(run => {
-          const dayStr = run.toLocaleDateString('en-CA');
-          if (!timelineDays[dayStr]) {
-            timelineDays[dayStr] = [];
-          }
-          timelineDays[dayStr].push({
-            time: run,
-            job: job,
-            isInterval: false
-          });
-        });
+    oneShotJobs.forEach(job => {
+      const run = new Date(job.scheduleAt);
+      if (Number.isNaN(run.getTime())) {
+        return;
       }
+      const dayStr = run.toLocaleDateString('en-CA');
+      if (!timelineDays[dayStr]) {
+        timelineDays[dayStr] = [];
+      }
+      timelineDays[dayStr].push({
+        time: run,
+        job: job,
+        isInterval: false
+      });
     });
     
     const todayStr = today.toLocaleDateString('en-CA');
@@ -591,8 +789,8 @@ function updateCalendar() {
                   : `<span class="event-time">${formatTime12Hour(e.time)}</span>`
                 }
                 <div class="event-info">
-                  <div class="event-name">${e.job.name}</div>
-                  ${!e.isInterval ? `<div class="event-schedule">${cronToEnglish(e.job.schedule)}</div>` : ''}
+                  <div class="event-name">${stripEmoji(e.job.name)}</div>
+                  ${!e.isInterval ? `<div class="event-schedule">${getScheduleDisplay(e.job)}</div>` : ''}
                 </div>
                 <div class="event-status ${e.job.status || 'pending'}"></div>
               </div>
@@ -611,7 +809,7 @@ function updateCalendar() {
             <line x1="8" y1="2" x2="8" y2="6"/>
             <line x1="3" y1="10" x2="21" y2="10"/>
           </svg>
-          <p>No scheduled jobs this week</p>
+          <p>No upcoming events this week</p>
         </div>
       `;
     }
@@ -648,11 +846,11 @@ function updateJobsList() {
   jobsList.innerHTML = jobs.map(job => `
     <div class="job-card" data-type="${job.type}">
       <div class="job-header">
-        <div class="job-name">${job.name}</div>
+        <div class="job-name">${stripEmoji(job.name)}</div>
         <span class="job-type ${job.type}">${job.type}</span>
       </div>
       <div class="job-meta">
-        <span class="job-schedule">${cronToEnglish(job.schedule)}</span>
+        <span class="job-schedule">${getScheduleDisplay(job)}</span>
         <span class="job-lastrun">Last: ${job.lastRun || 'Never'}</span>
       </div>
     </div>

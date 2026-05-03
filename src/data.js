@@ -92,6 +92,8 @@ function getSystemCrontabJobs() {
           type: 'scheduled',  // Changed from 'system-crontab' - more intuitive
           status: 'scheduled',  // Yellow dot = scheduled to run
           enabled: true,
+          scheduleKind: 'cron',
+          scheduleAt: null,
           schedule: cronToHumanSystem(schedule),
           command: cmd,
           nextRun: getNextRun(schedule),
@@ -115,9 +117,10 @@ function getJobRunsFromSyslog() {
   const runsMap = new Map();
   
   try {
-    // Use grep with -m to limit results early - much faster than scanning whole file
-    // Also use zgrep for compressed logs and limit to last 200 matches
-    const output = execSync('grep -m 200 "CRON.*steve" /var/log/syslog /var/log/syslog.1 2>/dev/null | tail -200', { encoding: 'utf8', timeout: 3000 });
+    // Use grep with higher limit to capture all days we care about
+    // Portainer runs every 15 min = ~96/day. For 7 days = ~700 entries alone.
+    // Plus misc other crons. Set limit to 5000 to get back ~35+ days.
+    const output = execSync('grep -m 5000 "CRON.*steve" /var/log/syslog /var/log/syslog.1 2>/dev/null', { encoding: 'utf8', timeout: 5000 });
     const lines = output.trim().split('\n');
     
     for (const line of lines) {
@@ -183,16 +186,20 @@ function getRunsForDate(dateStr) {
 // Check log file for success/failure
 function checkJobStatus(cmdShort) {
   const logMap = {
-    'backup_to_pcloud.sh': '/tmp/backup_cron.log',
-    'verify_backup.sh': '/tmp/backup_verify.log',
-    'send_morning_briefing.sh': '/tmp/morning_briefing.log',
-    'tibiadrome_reminder.sh': '/tmp/tibiadrome_reminder.log',
-    'tibiagoals_reminder.sh': '/tmp/tibiagoals_reminder.log',
-    'minimax_usage.py': '/tmp/minimax_usage.log',
-    'security_audit.sh': '/tmp/security_audit.log',
-    'double_exp_reminder.sh': '/tmp/double_exp_reminder.log',
-    'Team hunt': '/tmp/team_hunt.log',
-    'gog auth': '/tmp/gog_auth.log'
+    'backup_wrapper': '/tmp/backup_cron.log',
+    'verify_wrapper': '/tmp/backup_verify.log',
+    'cleanup_old_backups': '/tmp/backup_cleanup.log',
+    'send_morning_briefing': '/tmp/morning_briefing.log',
+    'tibiadrome_wrapper': '/tmp/tibiadrome_reminder.log',
+    'tibiagoals_wrapper': '/tmp/tibiagoals_reminder.log',
+    'minimax_wrapper': '/tmp/minimax_usage.log',
+    'security_audit_wrapper': '/tmp/security_audit.log',
+    'double_exp_wrapper': '/tmp/double_exp_reminder.log',
+    'team_hunt_wrapper': '/tmp/team_hunt.log',
+    'gog': '/tmp/gog_auth.log',
+    'track_trips': '/tmp/trip_tracking.log',
+    'log_morning_train': '/tmp/log_morning_train.log',
+    'log_evening_train': '/tmp/log_evening_train.log'
   };
   
   for (const [key, logFile] of Object.entries(logMap)) {
@@ -350,6 +357,8 @@ function getOpenClawJobs() {
         type: 'openclaw',
         status: job.state?.lastStatus || 'unknown',
         enabled: job.enabled,
+        scheduleKind: job.schedule?.kind || 'unknown',
+        scheduleAt: job.schedule?.at || null,
         schedule,
         command: job.payload?.message?.substring(0, 100) || job.payload?.text || 'agentTurn',
         nextRun: job.state?.nextRunAtMs ? new Date(job.state.nextRunAtMs).toLocaleString('en-US', { 
@@ -396,26 +405,43 @@ function getAllJobs() {
       .replace(/\s>>.*$/, '')
       .replace(/\s2>&1$/, '');
     
-    const runs = runsMap.get(cmdShort) || [];
-    if (runs.length > 0) {
-      // Sort by most recent
-      runs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-      job.lastRun = runs[0].timestamp;
-      job.runCount = runs.length;
-      // Check actual log for status
-      job.lastStatus = checkJobStatus(cmdShort);
-      job.status = job.lastStatus;
-      job.runs = runs.slice(0, 20).map(r => ({
-        timestamp: r.timestamp,
-        status: checkJobStatus(cmdShort),
-        summary: job.name,
-        command: r.command
-      }));
+    // For OpenClaw jobs - use cached runs if available, otherwise mark for lazy load
+    if (job.type === 'openclaw') {
+      const cached = openclawRunsCache.get(job.id);
+      if (cached && (Date.now() - cached.timestamp) < OPENCLAW_RUNS_TTL) {
+        job.runs = cached.runs;
+        if (cached.runs.length > 0) {
+          job.lastRun = cached.runs[0].timestamp;
+          job.lastStatus = cached.runs[0].status;
+          job.status = cached.runs[0].status;
+          job.runCount = cached.runs.length;
+        }
+      } else {
+        job.runs = [];
+        job.hasRunHistory = true; // Flag to indicate run history available on-demand
+      }
     } else {
-      // Check if there's a log file even without syslog entry
-      job.lastStatus = checkJobStatus(cmdShort);
-      job.status = job.lastStatus;
-      job.runs = [];
+      const runs = runsMap.get(cmdShort) || [];
+      if (runs.length > 0) {
+        // Sort by most recent
+        runs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+        job.lastRun = runs[0].timestamp;
+        job.runCount = runs.length;
+        // Check actual log for status
+        job.lastStatus = checkJobStatus(cmdShort);
+        job.status = job.lastStatus;
+        job.runs = runs.slice(0, 20).map(r => ({
+          timestamp: r.timestamp,
+          status: checkJobStatus(cmdShort),
+          summary: job.name,
+          command: r.command
+        }));
+      } else {
+        // Check if there's a log file even without syslog entry
+        job.lastStatus = checkJobStatus(cmdShort);
+        job.status = job.lastStatus;
+        job.runs = [];
+      }
     }
   }
   
@@ -458,6 +484,36 @@ function getJobLogs(jobId, type) {
   return [];
 }
 
+// Cache for OpenClaw job runs (2 minute TTL)
+const openclawRunsCache = new Map();
+const OPENCLAW_RUNS_TTL = 120000; // 2 minutes
+
+// Get OpenClaw cron run history for a specific job
+function getOpenClawJobRuns(jobId) {
+  // Check cache first
+  const cached = openclawRunsCache.get(jobId);
+  if (cached && (Date.now() - cached.timestamp) < OPENCLAW_RUNS_TTL) {
+    return cached.runs;
+  }
+  
+  try {
+    const output = execSync('openclaw cron runs --id ' + jobId + ' 2>/dev/null', { encoding: 'utf8', timeout: 5000 });
+    const data = JSON.parse(output);
+    const runs = (data.entries || []).slice(0, 10).map(entry => ({
+      timestamp: new Date(entry.ts).toISOString(),
+      status: entry.action === 'finished' ? (entry.status === 'ok' ? 'success' : 'failed') : 'running',
+      summary: entry.summary || entry.error || entry.action,
+      duration: entry.durationMs
+    }));
+    // Cache the results
+    openclawRunsCache.set(jobId, { runs, timestamp: Date.now() });
+    return runs;
+  } catch (e) {
+    // Don't cache failures
+    return [];
+  }
+}
+
 // Health check
 function getCronHealth() {
   const jobs = getSystemCrontabJobs();
@@ -496,5 +552,6 @@ module.exports = {
   getCronHealth,
   getJobRunsFromSyslog,
   getRunsForDate,
-  checkJobStatus
+  checkJobStatus,
+  getOpenClawJobRuns
 };
